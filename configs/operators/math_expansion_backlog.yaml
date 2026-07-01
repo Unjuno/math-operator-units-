@@ -1,0 +1,109 @@
+backlog_version: 1
+purpose: planned mathematical operator expansion before tokenizer freeze
+
+status_values:
+  - active
+  - planned_direct
+  - planned_reserved
+  - program_only
+  - speculative
+
+operators:
+  # scalar elementary
+  - {opcode: <SUB>, canonical_token: <OP_SCALAR_SUB>, kind: math_exact, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: program_only, priority: S0, notes: "Derived as ADD(NEG(rhs)); use token only if distilled."}
+  - {opcode: <MUL>, canonical_token: <OP_SCALAR_MUL>, kind: math_exact, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <DIV>, canonical_token: <OP_SCALAR_DIV>, kind: math_numeric, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S2, notes: "Do not confuse with calculus divergence."}
+  - {opcode: <SAFE_DIV>, canonical_token: <OP_SCALAR_SAFE_DIV>, kind: math_numeric, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <POW>, canonical_token: <OP_SCALAR_POW>, kind: math_numeric, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <SQ>, canonical_token: <OP_SCALAR_SQ>, kind: math_exact, domain: scalar, type_signature: "Scalar -> Scalar", status: program_only, priority: S1}
+  - {opcode: <SQRT>, canonical_token: <OP_SCALAR_SQRT>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <EXP>, canonical_token: <OP_SCALAR_EXP>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <LOG>, canonical_token: <OP_SCALAR_LOG>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <LOG2>, canonical_token: <OP_SCALAR_LOG2>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <LOG10>, canonical_token: <OP_SCALAR_LOG10>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <FLOOR>, canonical_token: <OP_SCALAR_FLOOR>, kind: math_discrete, domain: scalar, type_signature: "Real -> Int", status: planned_direct, priority: S2}
+  - {opcode: <CEIL>, canonical_token: <OP_SCALAR_CEIL>, kind: math_discrete, domain: scalar, type_signature: "Real -> Int", status: planned_direct, priority: S2}
+  - {opcode: <ROUND>, canonical_token: <OP_SCALAR_ROUND>, kind: math_discrete, domain: scalar, type_signature: "Real -> Int", status: planned_direct, priority: S2}
+  - {opcode: <TRUNC>, canonical_token: <OP_SCALAR_TRUNC>, kind: math_discrete, domain: scalar, type_signature: "Real -> Int", status: planned_direct, priority: S2}
+  - {opcode: <MOD>, canonical_token: <OP_SCALAR_MOD>, kind: math_discrete, domain: scalar, type_signature: "Int x Int -> Int", status: planned_direct, priority: S2}
+  - {opcode: <CLIP>, canonical_token: <OP_SCALAR_CLIP>, kind: math_exact, domain: scalar, type_signature: "Scalar x Scalar x Scalar -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <SIGN>, canonical_token: <OP_SCALAR_SIGN>, kind: math_discrete, domain: scalar, type_signature: "Scalar -> {-1,0,1}", status: planned_direct, priority: S1}
+
+  # trig and hyperbolic
+  - {opcode: <SIN>, canonical_token: <OP_SCALAR_SIN>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <COS>, canonical_token: <OP_SCALAR_COS>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <TAN>, canonical_token: <OP_SCALAR_TAN>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <ASIN>, canonical_token: <OP_SCALAR_ASIN>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <ACOS>, canonical_token: <OP_SCALAR_ACOS>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <ATAN>, canonical_token: <OP_SCALAR_ATAN>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <ATAN2>, canonical_token: <OP_SCALAR_ATAN2>, kind: math_numeric, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <SINH>, canonical_token: <OP_SCALAR_SINH>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <COSH>, canonical_token: <OP_SCALAR_COSH>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <TANH>, canonical_token: <OP_SCALAR_TANH>, kind: math_numeric, domain: scalar, type_signature: "Scalar -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <HYPOT>, canonical_token: <OP_SCALAR_HYPOT>, kind: math_numeric, domain: scalar, type_signature: "Scalar x Scalar -> Scalar", status: planned_direct, priority: S3}
+
+  # comparison and ordering
+  - {opcode: <EQ>, canonical_token: <OP_COMPARE_EQ>, kind: math_discrete, domain: compare, type_signature: "X x X -> Bool", status: planned_direct, priority: S1}
+  - {opcode: <NEQ>, canonical_token: <OP_COMPARE_NEQ>, kind: math_discrete, domain: compare, type_signature: "X x X -> Bool", status: program_only, priority: S1}
+  - {opcode: <LT>, canonical_token: <OP_COMPARE_LT>, kind: math_discrete, domain: compare, type_signature: "Scalar x Scalar -> Bool", status: planned_direct, priority: S1}
+  - {opcode: <LE>, canonical_token: <OP_COMPARE_LE>, kind: math_discrete, domain: compare, type_signature: "Scalar x Scalar -> Bool", status: planned_direct, priority: S1}
+  - {opcode: <ARGMIN>, canonical_token: <OP_COMPARE_ARGMIN>, kind: math_discrete, domain: compare, type_signature: "ScalarSeq -> Index", status: planned_direct, priority: S3}
+  - {opcode: <ARGMAX>, canonical_token: <OP_COMPARE_ARGMAX>, kind: math_discrete, domain: compare, type_signature: "ScalarSeq -> Index", status: planned_direct, priority: S3}
+  - {opcode: <TOPK>, canonical_token: <OP_COMPARE_TOPK>, kind: math_discrete, domain: compare, type_signature: "ScalarSeq x Int -> IndexSeq", status: planned_direct, priority: S3}
+  - {opcode: <SORT>, canonical_token: <OP_COMPARE_SORT>, kind: math_discrete, domain: compare, type_signature: "ScalarSeq -> ScalarSeq", status: planned_direct, priority: S3}
+  - {opcode: <RANK>, canonical_token: <OP_COMPARE_RANK>, kind: math_discrete, domain: compare, type_signature: "ScalarSeq -> IntSeq", status: planned_direct, priority: S3}
+
+  # aggregation/statistics
+  - {opcode: <SUM_ALL>, canonical_token: <OP_AGG_SUM>, kind: math_exact, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S0}
+  - {opcode: <PROD_ALL>, canonical_token: <OP_AGG_PROD>, kind: math_exact, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <MEAN>, canonical_token: <OP_AGG_MEAN>, kind: math_numeric, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <VAR>, canonical_token: <OP_AGG_VAR>, kind: math_numeric, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <STD>, canonical_token: <OP_AGG_STD>, kind: math_numeric, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <AGG_MIN>, canonical_token: <OP_AGG_MIN>, kind: math_exact, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <AGG_MAX>, canonical_token: <OP_AGG_MAX>, kind: math_exact, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <MEDIAN>, canonical_token: <OP_AGG_MEDIAN>, kind: math_discrete, domain: aggregation, type_signature: "ScalarSeq -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <QUANTILE>, canonical_token: <OP_AGG_QUANTILE>, kind: math_discrete, domain: aggregation, type_signature: "ScalarSeq x Real -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <NORM_L1>, canonical_token: <OP_AGG_NORM_L1>, kind: math_exact, domain: aggregation, type_signature: "Vector -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <NORM_L2>, canonical_token: <OP_AGG_NORM_L2>, kind: math_numeric, domain: aggregation, type_signature: "Vector -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <NORM_INF>, canonical_token: <OP_AGG_NORM_INF>, kind: math_exact, domain: aggregation, type_signature: "Vector -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <NORMALIZE_L2>, canonical_token: <OP_AGG_NORMALIZE_L2>, kind: math_numeric, domain: aggregation, type_signature: "Vector -> Vector", status: planned_direct, priority: S2}
+  - {opcode: <CENTER>, canonical_token: <OP_AGG_CENTER>, kind: math_exact, domain: aggregation, type_signature: "ScalarSeq -> ScalarSeq", status: planned_direct, priority: S0}
+  - {opcode: <STANDARDIZE>, canonical_token: <OP_AGG_STANDARDIZE>, kind: math_numeric, domain: aggregation, type_signature: "ScalarSeq -> ScalarSeq", status: planned_direct, priority: S2}
+
+  # linear algebra
+  - {opcode: <DOT>, canonical_token: <OP_LINALG_DOT>, kind: math_exact, domain: linalg, type_signature: "Vector x Vector -> Scalar", status: planned_direct, priority: S1}
+  - {opcode: <OUTER>, canonical_token: <OP_LINALG_OUTER>, kind: math_exact, domain: linalg, type_signature: "Vector x Vector -> Matrix", status: planned_direct, priority: S2}
+  - {opcode: <MATMUL>, canonical_token: <OP_LINALG_MATMUL>, kind: math_exact, domain: linalg, type_signature: "Matrix x Matrix -> Matrix", status: planned_direct, priority: S2}
+  - {opcode: <TRANSPOSE>, canonical_token: <OP_LINALG_TRANSPOSE>, kind: math_exact, domain: linalg, type_signature: "Matrix -> Matrix", status: planned_direct, priority: S1}
+  - {opcode: <TRACE>, canonical_token: <OP_LINALG_TRACE>, kind: math_exact, domain: linalg, type_signature: "Matrix -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <DET>, canonical_token: <OP_LINALG_DET>, kind: math_numeric, domain: linalg, type_signature: "Matrix -> Scalar", status: planned_direct, priority: S3}
+  - {opcode: <INV>, canonical_token: <OP_LINALG_INV>, kind: math_numeric, domain: linalg, type_signature: "Matrix -> Matrix", status: planned_direct, priority: S4}
+  - {opcode: <SOLVE_LINEAR>, canonical_token: <OP_LINALG_SOLVE>, kind: math_numeric, domain: linalg, type_signature: "Matrix x Vector -> Vector", status: planned_direct, priority: S3}
+  - {opcode: <EIGEN>, canonical_token: <OP_LINALG_EIGEN>, kind: math_numeric, domain: linalg, type_signature: "Matrix -> Spectrum", status: planned_direct, priority: S4}
+  - {opcode: <SVD>, canonical_token: <OP_LINALG_SVD>, kind: math_numeric, domain: linalg, type_signature: "Matrix -> Factors", status: planned_direct, priority: S4}
+  - {opcode: <PROJ_VECTOR>, canonical_token: <OP_LINALG_PROJ_VECTOR>, kind: math_numeric, domain: linalg, type_signature: "Vector x Vector -> Vector", status: planned_direct, priority: S1}
+  - {opcode: <ORTH_REMOVE>, canonical_token: <OP_LINALG_ORTH_REMOVE>, kind: math_numeric, domain: linalg, type_signature: "Vector x Vector -> Vector", status: planned_direct, priority: S1}
+
+  # calculus/PDE
+  - {opcode: <DIFF>, canonical_token: <OP_CALC_DIFF>, kind: math_functional, domain: calculus, type_signature: "Function -> Function", status: planned_direct, priority: S3}
+  - {opcode: <D_X>, canonical_token: <OP_CALC_DX>, kind: math_functional, domain: calculus, type_signature: "Field -> Field", status: planned_direct, priority: S3}
+  - {opcode: <D_T>, canonical_token: <OP_CALC_DT>, kind: math_functional, domain: calculus, type_signature: "Field -> Field", status: planned_direct, priority: S3}
+  - {opcode: <D_XX>, canonical_token: <OP_CALC_DXX>, kind: math_functional, domain: calculus, type_signature: "Field -> Field", status: planned_direct, priority: S3}
+  - {opcode: <GRAD>, canonical_token: <OP_CALC_GRAD>, kind: math_functional, domain: calculus, type_signature: "ScalarField -> VectorField", status: planned_direct, priority: S3}
+  - {opcode: <DIVERGENCE>, canonical_token: <OP_CALC_DIVERGENCE>, kind: math_functional, domain: calculus, type_signature: "VectorField -> ScalarField", status: planned_direct, priority: S3}
+  - {opcode: <CURL>, canonical_token: <OP_CALC_CURL>, kind: math_functional, domain: calculus, type_signature: "VectorField -> VectorField", status: planned_direct, priority: S4}
+  - {opcode: <LAPLACIAN>, canonical_token: <OP_CALC_LAPLACIAN>, kind: math_functional, domain: calculus, type_signature: "Field -> Field", status: planned_direct, priority: S3}
+  - {opcode: <JACOBIAN>, canonical_token: <OP_CALC_JACOBIAN>, kind: math_functional, domain: calculus, type_signature: "VectorFunction -> MatrixField", status: planned_direct, priority: S4}
+  - {opcode: <HESSIAN>, canonical_token: <OP_CALC_HESSIAN>, kind: math_functional, domain: calculus, type_signature: "ScalarFunction -> MatrixField", status: planned_direct, priority: S4}
+  - {opcode: <INTEGRAL>, canonical_token: <OP_CALC_INTEGRAL>, kind: math_numeric, domain: calculus, type_signature: "Function -> ScalarOrFunction", status: planned_direct, priority: S3}
+  - {opcode: <CONVOLUTION>, canonical_token: <OP_CALC_CONVOLUTION>, kind: math_functional, domain: calculus, type_signature: "Function x Function -> Function", status: planned_direct, priority: S3}
+  - {opcode: <FOURIER>, canonical_token: <OP_CALC_FOURIER>, kind: math_functional, domain: calculus, type_signature: "Function -> Function", status: planned_direct, priority: S3}
+
+  # probability / information
+  - {opcode: <SIGMOID>, canonical_token: <OP_PROB_SIGMOID>, kind: math_numeric, domain: probability, type_signature: "Scalar -> Probability", status: planned_direct, priority: S1}
+  - {opcode: <SOFTMAX>, canonical_token: <OP_PROB_SOFTMAX>, kind: math_numeric, domain: probability, type_signature: "Logits -> ProbabilityVector", status: planned_direct, priority: S1}
+  - {opcode: <LOGSOFTMAX>, canonical_token: <OP_PROB_LOGSOFTMAX>, kind: math_numeric, domain: probability, type_signature: "Logits -> LogProbVector", status: planned_direct, priority: S1}
+  - {opcode: <ENTROPY>, canonical_token: <OP_PROB_ENTROPY>, kind: math_numeric, domain: probability, type_signature: "ProbabilityVector -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <KL>, canonical_token: <OP_PROB_KL>, kind: math_numeric, domain: probability, type_signature: "ProbabilityVector x ProbabilityVector -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <JSD>, canonical_token: <OP_PROB_JSD>, kind: math_numeric, domain: probability, type_signature: "ProbabilityVector x ProbabilityVector -> Scalar", status: planned_direct, priority: S2}
+  - {opcode: <CROSS_ENTROPY>, canonical_token: <OP_PROB_CROSS_ENTROPY>, kind: math_numeric, domain: probability, type_signature: "ProbabilityVector x ProbabilityVector -> Scalar", status: planned_direct, priority: S1}
