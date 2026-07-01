@@ -1,17 +1,27 @@
 # Equivalence Trace Training Plan
 
-Exact evaluators should emit more than final answers, but equality-chain training must not create a shortcut where the model learns that an equals sign should be followed immediately by the final answer and end-of-sequence.
+Exact evaluators should emit more than final answers, but equality-chain training must avoid two opposite failure modes.
 
-The goal is not:
+Failure mode A:
 
 ```text
 expression = final_answer <EOS>
 ```
 
+The model treats `=` as a final-answer trigger.
+
+Failure mode B:
+
+```text
+expression = expression' = expression'' = expression''' = ...
+```
+
+The model treats `=` as an unconditional continuation trigger and keeps producing equality steps without convergence.
+
 The goal is:
 
 ```text
-expression -> valid next transformation candidates -> verified progress -> optional final value
+expression -> valid next transformation candidates -> verified progress -> verifier-backed stop
 ```
 
 ## 1. Core distinction
@@ -24,16 +34,22 @@ equivalence trace generator:
   emits verified equivalent expressions and rewrite steps
 
 trace policy:
-  controls when final values and stop tokens are exposed during training
+  controls when final values, continuation steps, and stop tokens are exposed during training
+
+stop verifier:
+  decides whether the current state is an acceptable terminal form
+
+loop detector:
+  rejects repeated, cyclic, or no-progress equality chains
 ```
 
-All three are needed.
+All five are needed.
 
-## 2. Main training hazard
+## 2. Main training hazards
 
 Do not train every sequence as a full equality chain ending in the final answer.
 
-Bad global pattern:
+Bad final-answer pattern:
 
 ```text
 1 + 2 + 3 = 3 + 3 = 6 <EOS>
@@ -49,7 +65,23 @@ after "=" -> emit final answer -> emit <EOS>
 
 That shortcut is harmful because it bypasses search for better transformations, non-monotonic expansions, alternative solution paths, and compressed traces.
 
-## 3. Required anti-shortcut policy
+Also do not train equality growth as an unconditional action.
+
+Bad continuation pattern:
+
+```text
+after a valid step -> always emit another equality step
+```
+
+If this pattern dominates, the model can learn:
+
+```text
+after valid state -> emit "=" forever
+```
+
+That loop is harmful because it rewards trace length instead of verified progress.
+
+## 3. Required anti-shortcut and anti-loop policy
 
 Training data must separate these objectives.
 
@@ -66,15 +98,21 @@ rewrite-rule prediction:
 trace-continuation prediction:
   partial trace -> continue with a valid nonterminal step
 
+stop prediction:
+  partial trace -> continue or stop
+
 verification:
   before/after pair -> valid or invalid
+
+progress scoring:
+  partial trace -> progress score or no-progress flag
 ```
 
 Do not collapse all objectives into one sequence format.
 
 ## 4. Token policy
 
-Use typed delimiters instead of treating plain equals as a universal final-answer marker.
+Use typed delimiters instead of treating plain equals as a universal final-answer or universal-continuation marker.
 
 Recommended tokens:
 
@@ -93,9 +131,15 @@ Recommended tokens:
 
 <VERIFY_STEP>:
   verify a proposed before/after pair
+
+<PROGRESS>:
+  mark verified progress
+
+<NO_PROGRESS>:
+  mark a valid but unhelpful or cyclic step
 ```
 
-Plain `=` may appear in rendered text, but the model-facing target should distinguish nonterminal equality from final answer emission.
+Plain `=` may appear in rendered text, but the model-facing target should distinguish nonterminal equality, final answer emission, and stop decisions.
 
 ## 5. Target formats
 
@@ -133,7 +177,19 @@ target:
 terminal: true
 ```
 
-### 5.4 Verification task
+### 5.4 Stop task
+
+```yaml
+task: stop_decision
+input_trace:
+  - "1 + 2 + 3"
+  - "3 + 3"
+  - "6"
+target: stop
+reason: canonical_value_reached
+```
+
+### 5.5 Verification task
 
 ```yaml
 task: verify_step
@@ -142,7 +198,19 @@ after: "3 + 3"
 target: valid
 ```
 
-### 5.5 Strategy task
+### 5.6 Progress task
+
+```yaml
+task: progress_score
+input_trace:
+  - "1 + 2 + 3"
+  - "3 + 3"
+target:
+  progress: true
+  reason: reduced_unresolved_additions
+```
+
+### 5.7 Strategy task
 
 ```yaml
 task: choose_strategy
@@ -172,7 +240,10 @@ Rules:
 - Do not always terminate after the first equals sign.
 - Do not always expose the final answer after equals.
 - Do not always include <EOS> immediately after the canonical value.
+- Do not always continue after a valid equality step.
 - Include nonterminal equality steps.
+- Include stop-decision examples.
+- Include no-progress and loop-negative examples.
 - Include tasks where the final answer is hidden and only the next step is trained.
 - Include verification-only tasks where no answer is emitted.
 ```
@@ -229,7 +300,63 @@ global verified progress must improve
 
 Do not train the model to always simplify immediately. Train it to choose verified transformations that improve the solution path.
 
-## 9. Trace validity rule
+## 9. Anti-loop policy
+
+A valid equivalence step is not automatically a good training target.
+
+Examples of bad but potentially valid loops:
+
+```text
+a + b = b + a = a + b = b + a = ...
+```
+
+```text
+x = x + 0 = x + 0 + 0 = x + 0 + 0 + 0 = ...
+```
+
+```text
+x = 1 * x = 1 * 1 * x = 1 * 1 * 1 * x = ...
+```
+
+These preserve value but do not make useful progress.
+
+Rules:
+
+```text
+- Every accepted nonterminal step must be verified equivalent.
+- Verification alone is insufficient.
+- The step must either improve a progress potential, enable a later contraction, or be explicitly marked as exploratory.
+- Repeated canonical forms are rejected.
+- Repeated rule cycles are penalized.
+- Identity insertions need a bounded budget.
+- Trace length has a hard maximum.
+- Stop decisions are trained explicitly.
+```
+
+## 10. Progress potential
+
+Use a progress potential to distinguish useful growth from equality spam.
+
+Candidate fields:
+
+```text
+token_length
+tree_depth
+unresolved_operator_count
+numeric_difficulty
+canonical_distance
+new_structure_exposed
+future_contraction_available
+```
+
+The potential does not need to decrease at every step, but over a bounded window it must improve.
+
+```text
+local non-monotonicity allowed
+bounded-window no-progress forbidden
+```
+
+## 11. Trace validity rule
 
 Do not emit arbitrary or unverified chains.
 
@@ -243,11 +370,12 @@ before: "1 + 2 + 3"
 after: "2 + 4"
 verified: true
 terminal: false
+progress: true
 ```
 
 The rule must be explicit and verifiable.
 
-## 10. Supported first operators
+## 12. Supported first operators
 
 Start with exact finite operators:
 
@@ -277,25 +405,27 @@ program-only derived operators
 symbolic rewrites
 ```
 
-## 11. Training mix
+## 13. Training mix
 
 Use a mixed objective distribution.
 
 Recommended initial mix:
 
 ```text
-final_value: 20%
-next_step: 35%
+final_value: 15%
+next_step: 30%
 rewrite_rule: 15%
 trace_continue: 15%
-verify_step: 15%
+stop_decision: 10%
+verify_step: 10%
+progress_score: 5%
 ```
 
-The final-answer objective should not dominate early training.
+The final-answer objective should not dominate early training, and the continuation objective should not dominate stop training.
 
-## 12. Metrics
+## 14. Metrics
 
-Add trace-specific and shortcut-specific metrics:
+Add trace-specific, shortcut-specific, and loop-specific metrics:
 
 ```text
 final_value_accuracy
@@ -310,6 +440,13 @@ nonterminal_step_accuracy
 strategy_diversity
 verified_progress_after_expansion_rate
 dead_expansion_rate
+equals_continuation_rate
+stop_decision_accuracy
+repeated_state_rate
+rule_cycle_rate
+identity_insertion_rate
+max_trace_length_violation_rate
+no_progress_window_rate
 ```
 
 Especially monitor:
@@ -317,16 +454,21 @@ Especially monitor:
 ```text
 first_equals_final_answer_rate
 equals_to_eos_rate
+equals_continuation_rate
+repeated_state_rate
+no_progress_window_rate
 ```
 
-These detect whether the model has learned the unwanted shortcut.
+These detect whether the model has learned either unwanted shortcut: terminate immediately or continue forever.
 
-## 13. Final rule
+## 15. Final rule
 
 ```text
 Do not train equality as a final-answer shortcut.
+Do not train equality as an unconditional continuation shortcut.
 Train value separately.
 Train next-step transformations separately.
-Train verification separately.
+Train stop decisions separately.
+Train verification and progress separately.
 Expose full equality chains only as one view, not as the universal target.
 ```
