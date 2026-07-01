@@ -86,6 +86,7 @@ The mathematical operator experiments are controlled proxies for this goal. They
 - [`docs/logit_bias_semantics.md`](docs/logit_bias_semantics.md): primary research framing for logit-space bias semantics.
 - [`docs/parallel_sequence_bias_control.md`](docs/parallel_sequence_bias_control.md): same-prefix parallel model/unit outputs and bias-field control.
 - [`docs/generation_path_reliability_calibrator.md`](docs/generation_path_reliability_calibrator.md): generator + path reliability calibrator design.
+- [`docs/reliability_calibrator_training_plan.md`](docs/reliability_calibrator_training_plan.md): training plan for paired reliability calibrators.
 - [`docs/tokenizer_design.md`](docs/tokenizer_design.md): tokenizer and vocabulary policy.
 - [`docs/shared_numeric_equality_abi.md`](docs/shared_numeric_equality_abi.md): shared number/equality ABI policy for all units.
 - [`docs/equivalence_trace_training_plan.md`](docs/equivalence_trace_training_plan.md): equality trace data and anti-shortcut / anti-loop training policy.
