@@ -2,7 +2,7 @@
 
 This repository studies **logit-space semantics for same-prefix parallel bias control** through operator-specific model units.
 
-The goal is not primarily to build a neural calculator, a faster router, keyword-based mode switching, or a replacement for symbolic computation. The goal is to run multiple model/unit outputs over the same sequence context, treat their differences as bias fields, transform those fields with human-interpretable bias operations, and test whether their softmax and verifier effects survive correction and composition.
+The goal is not primarily to build a neural calculator, a faster router, keyword-based mode switching, or a replacement for symbolic computation. The goal is to run multiple model/unit outputs over the same sequence context, treat their differences as bias fields, fully compose those fields with human-interpretable bias operations, and test whether the composed field changes the next-token distribution in the intended direction.
 
 Each operator unit has two components:
 
@@ -11,9 +11,16 @@ U_k = (M_k, C_k)
 ```
 
 - `M_k`: main operator model that produces an operator-specific bias, logit contribution, or proposal.
-- `C_k`: corrector / contribution controller that decides how much of that bias field may affect the final logits.
+- `C_k`: corrector / contribution calibrator that controls scale, confidence, angle, or reliability of that bias field when it is composed with other fields.
 
-The runtime fusion rule is:
+The composition-first runtime rule is:
+
+```text
+F(v | x) = O_calibrated(B_1, B_2, ..., B_n)(v | x)
+z_final(v | x) = z_0(v | x) + λ F(v | x)
+```
+
+A simple token-wise contribution form is:
 
 ```text
 z_final(v | x) = z_0(v | x) + Σ_{k in S_runtime} c_k(v | x) b_k(v | x)
@@ -25,7 +32,7 @@ A scalar gate version is allowed as an approximation:
 z_final(v | x) = z_0(v | x) + Σ_{k in S_runtime} g_k(x) b_k(v | x)
 ```
 
-where `S_runtime` is the selected runtime set for the current experiment. The main target is not to route to one expert, but to compose multiple corrected bias fields over the same sequence prefix.
+where `S_runtime` is the selected runtime set for the current experiment. The main target is not to route to one expert or hard-disable competing fields. The target is to compose multiple bias fields over the same sequence prefix, calibrate confidence or alignment when needed, and let the final softmax prefer the high-confidence or high-alignment direction.
 
 ## Project framing
 
@@ -54,7 +61,7 @@ Its meaning is defined by its induced distributional and verifier effects:
 ΔV(F) = E_{y ~ p_F}[V(y)] - E_{y ~ p_0}[V(y)]
 ```
 
-The mathematical operator experiments are controlled proxies for this goal. They test whether learned bias operators such as composition, difference, projection removal, agreement, completion, and residual decomposition can be learned, corrected, and composed before moving to less transparent LLM settings.
+The mathematical operator experiments are controlled proxies for this goal. They test whether learned bias operators such as composition, mean, weighted sum, confidence selection, difference, projection removal, agreement, completion, and residual decomposition can be learned, calibrated, and composed before moving to less transparent LLM settings.
 
 ## Core design rules
 
@@ -69,9 +76,9 @@ The mathematical operator experiments are controlled proxies for this goal. They
 9. `dispatch` must remain false in runtime fusion manifests.
 10. Numbers, equality, and structural expression tokens are shared ABI tokens across all units.
 11. Operator units learn transformation distributions over the shared numeric/equality ABI; they must not redefine numbers or equality.
-12. Raw fusion must not assume inactive units are neutral; corrected fusion must measure and suppress inactive bias leakage.
-13. A learned bias module has semantic force only through its measured softmax/verifier effect and its applicability-corrected contribution.
-14. Runtime control should be framed as same-prefix parallel bias-field control, not keyword-based mode switching.
+12. Direct summation must not assume inactive fields are neutral; calibrated composition must measure and control inactive bias leakage.
+13. A learned bias module has semantic force only through its measured softmax/verifier effect and its calibrated contribution to the same-prefix next-token distribution.
+14. Runtime control should be framed as same-prefix parallel bias-field composition, not keyword-based mode switching.
 
 ## Initial documents
 
@@ -80,7 +87,7 @@ The mathematical operator experiments are controlled proxies for this goal. They
 - [`docs/tokenizer_design.md`](docs/tokenizer_design.md): tokenizer and vocabulary policy.
 - [`docs/shared_numeric_equality_abi.md`](docs/shared_numeric_equality_abi.md): shared number/equality ABI policy for all units.
 - [`docs/equivalence_trace_training_plan.md`](docs/equivalence_trace_training_plan.md): equality trace data and anti-shortcut / anti-loop training policy.
-- [`docs/raw_fusion_failure_observations.md`](docs/raw_fusion_failure_observations.md): preliminary 0.1K proxy observations motivating corrector-gated fusion.
+- [`docs/raw_fusion_failure_observations.md`](docs/raw_fusion_failure_observations.md): preliminary 0.1K proxy observations motivating calibrated/corrected fusion.
 - [`configs/tokenizer/tokenizer_core_v1.yaml`](configs/tokenizer/tokenizer_core_v1.yaml): initial tokenizer profile.
 - [`configs/operators/registry.yaml`](configs/operators/registry.yaml): initial operator registry scaffold.
 
@@ -106,7 +113,7 @@ The first learned units should target:
 <OP_CTRL_ABSTAIN>
 ```
 
-The first evaluation target is not broad problem solving. It is reproducible verification that parallel same-prefix bias control suppresses inactive contributions and preserves useful active contributions.
+The first evaluation target is not broad problem solving. It is reproducible verification that parallel same-prefix bias control composes competing fields, controls unreliable contributions, and preserves useful active contributions.
 
 ## Preliminary raw fusion observation
 
@@ -115,10 +122,10 @@ Early 0.1K proxy experiments suggest that inactive operator models do not reliab
 This motivates treating a stable fusion unit as a pair:
 
 ```text
-operator unit = main model + contribution controller
+operator unit = main model + contribution calibrator
 ```
 
-The main model proposes an operator-specific contribution. The corrector controls how much of that contribution affects the final same-prefix next-token distribution.
+The main model proposes an operator-specific contribution. The calibrator controls scale, confidence, angle, or reliability so that raw peakedness alone does not dominate the final same-prefix next-token distribution.
 
 ## Shared numeric and equality ABI
 
@@ -180,3 +187,5 @@ Valid equivalence is not the same as useful progress. Equality traces must there
 - `parallel_field_agreement`
 - `parallel_field_conflict`
 - `control_success_rate`
+- `confidence_calibration_error`
+- `angle_alignment_score`
