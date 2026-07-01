@@ -66,6 +66,12 @@ type_tokens:
   - <T_TEXT>
   - <T_DOCS>
   - <T_TOOL_RESULT>
+  - <T_INDEX>
+  - <T_GRAPH>
+  - <T_COMPLEX>
+  - <T_PROGRAM>
+  - <T_RESIDUAL>
+  - <T_VERDICT>
 
 numeric_tokens:
   atomic_integer_range:
@@ -104,7 +110,15 @@ operator_namespaces:
   - <OP_BIAS_*>
   - <OP_OPT_*>
   - <OP_PDE_*>
+  - <OP_TENSOR_*>
+  - <OP_GRAPH_*>
+  - <OP_GEOM_*>
+  - <OP_COMPLEX_*>
+  - <OP_SPECIAL_*>
   - <OP_CTRL_*>
+  - <OP_FUSION_*>
+  - <OP_VERIFY_*>
+  - <OP_CANDIDATE_*>
   - <OP_SEM_*>
   - <OP_TOOL_*>
 
@@ -131,6 +145,10 @@ core_operator_tokens:
     - <OP_CTRL_SUPPRESS>
     - <OP_CTRL_ABSTAIN>
 
+planned_operator_lists:
+  math: configs/operators/math_expansion_backlog.yaml
+  custom: configs/operators/custom_operator_backlog.yaml
+
 reserved_operator_slots:
   count: 4096
   format: <OP_RESERVED_{index:04d}>
@@ -150,6 +168,7 @@ ci_checks:
   - no_duplicate_token_strings
   - no_duplicate_token_ids
   - registry_operator_tokens_exist_in_vocab
+  - backlog_operator_tokens_exist_or_are_reserved
   - program_only_operators_do_not_require_direct_tokens
   - reserved_token_assignment_is_unique
   - checkpoints_declare_tokenizer_hash
