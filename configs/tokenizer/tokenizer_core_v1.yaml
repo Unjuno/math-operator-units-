@@ -150,10 +150,10 @@ planned_operator_lists:
   custom: configs/operators/custom_operator_backlog.yaml
 
 reserved_operator_slots:
-  count: 4096
+  count: 8192
   format: <OP_RESERVED_{index:04d}>
   first: <OP_RESERVED_0000>
-  last: <OP_RESERVED_4095>
+  last: <OP_RESERVED_8191>
   assignment_policy:
     once_assigned_never_reassign: true
     record_assignment_in_registry_history: true
