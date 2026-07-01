@@ -1,0 +1,315 @@
+registry_version: 1
+project: math-operator-units
+tokenizer_profile: tokenizer_core_v1
+
+operator_kinds:
+  - math_exact
+  - math_numeric
+  - math_discrete
+  - math_functional
+  - bias_algebra
+  - non_math_control
+  - non_math_semantic
+  - non_math_tool
+
+implementation_modes:
+  - unit
+  - program
+  - distilled_unit
+  - tool
+  - spec_only
+
+operators:
+  - opcode: <ZERO>
+    id: scalar.zero
+    canonical_token: <OP_SCALAR_ZERO>
+    symbol: "0"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Any -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_zero
+    default_unit:
+      main_model: ConstantZeroUnit
+      corrector: GateCorrector
+      tier: nano
+    required_metrics:
+      - single_accuracy
+      - fusion_accuracy
+      - inactive_leakage_mean
+
+  - opcode: <ID>
+    id: scalar.id
+    canonical_token: <OP_SCALAR_ID>
+    symbol: "id"
+    kind: math_exact
+    domain: scalar
+    type_signature: "X -> X"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_id
+    default_unit:
+      main_model: LinearUnit
+      corrector: GateCorrector
+      tier: nano
+
+  - opcode: <NEG>
+    id: scalar.neg
+    canonical_token: <OP_SCALAR_NEG>
+    symbol: "-x"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Scalar -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_neg
+    default_unit:
+      main_model: LinearUnit
+      corrector: GateCorrector
+      tier: nano
+
+  - opcode: <ADD>
+    id: scalar.add
+    canonical_token: <OP_SCALAR_ADD>
+    symbol: "+"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Scalar x Scalar -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_add
+    default_unit:
+      main_model: LinearUnit
+      corrector: GateCorrector
+      tier: nano
+    negative_generators:
+      - gen_type_mismatch
+      - gen_short_mixed
+      - gen_other_scalar_ops
+
+  - opcode: <SUB>
+    id: scalar.sub
+    canonical_token: null
+    symbol: "-"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Scalar x Scalar -> Scalar"
+    primitive: false
+    implementation_mode: program
+    priority: S0
+    evaluator_fn: eval_sub
+    program:
+      - "x1 = <NEG>(rhs)"
+      - "out = <ADD>(lhs, x1)"
+
+  - opcode: <ABS>
+    id: scalar.abs
+    canonical_token: <OP_SCALAR_ABS>
+    symbol: "abs"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Scalar -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_abs
+    default_unit:
+      main_model: MLPUnit
+      corrector: GateCorrector
+      tier: micro
+
+  - opcode: <POS>
+    id: scalar.pos
+    canonical_token: <OP_SCALAR_POS>
+    symbol: "x_+"
+    kind: math_exact
+    domain: scalar
+    type_signature: "Scalar -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_pos
+    default_unit:
+      main_model: MLPUnit
+      corrector: GateCorrector
+      tier: micro
+
+  - opcode: <MIN>
+    id: scalar.min
+    canonical_token: <OP_SCALAR_MIN>
+    symbol: "min"
+    kind: math_exact
+    domain: scalar
+    type_signature: "ScalarSeq -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_min
+    default_unit:
+      main_model: MLPUnit
+      corrector: GateCorrector
+      tier: micro
+
+  - opcode: <MAX>
+    id: scalar.max
+    canonical_token: <OP_SCALAR_MAX>
+    symbol: "max"
+    kind: math_exact
+    domain: scalar
+    type_signature: "ScalarSeq -> Scalar"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_max
+    default_unit:
+      main_model: MLPUnit
+      corrector: GateCorrector
+      tier: micro
+
+  - opcode: <BIAS_ADD>
+    id: bias.add
+    canonical_token: <OP_BIAS_ADD>
+    symbol: "A+B"
+    kind: bias_algebra
+    domain: bias
+    type_signature: "Bias x Bias -> Bias"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_bias_add
+    default_unit:
+      main_model: LinearBiasUnit
+      corrector: GateCorrector
+      tier: nano
+
+  - opcode: <BIAS_SUB>
+    id: bias.sub
+    canonical_token: <OP_BIAS_SUB>
+    symbol: "A-B"
+    kind: bias_algebra
+    domain: bias
+    type_signature: "Bias x Bias -> Bias"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_bias_sub
+    default_unit:
+      main_model: LinearBiasUnit
+      corrector: GateCorrector
+      tier: nano
+
+  - opcode: <BIAS_CENTER>
+    id: bias.center
+    canonical_token: <OP_BIAS_CENTER>
+    symbol: "A-mean(A)"
+    kind: bias_algebra
+    domain: bias
+    type_signature: "Bias -> Bias"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_bias_center
+    default_unit:
+      main_model: LinearBiasUnit
+      corrector: GateCorrector
+      tier: nano
+
+  - opcode: <BIAS_POS>
+    id: bias.pos
+    canonical_token: <OP_BIAS_POS>
+    symbol: "A_+"
+    kind: bias_algebra
+    domain: bias
+    type_signature: "Bias -> Bias"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_bias_pos
+    default_unit:
+      main_model: MLPBiasUnit
+      corrector: GateCorrector
+      tier: micro
+
+  - opcode: <GATE>
+    id: control.gate
+    canonical_token: <OP_CTRL_GATE>
+    symbol: "g(x)"
+    kind: non_math_control
+    domain: control
+    type_signature: "Input -> [0,1]"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_gate_targets
+    default_unit:
+      main_model: GateCorrector
+      corrector: null
+      tier: nano
+
+  - opcode: <SUPPRESS>
+    id: control.suppress
+    canonical_token: <OP_CTRL_SUPPRESS>
+    symbol: "g*b"
+    kind: non_math_control
+    domain: control
+    type_signature: "Gate x Bias -> Bias"
+    primitive: true
+    implementation_mode: unit
+    priority: S0
+    evaluator_fn: eval_suppress
+    default_unit:
+      main_model: SuppressionUnit
+      corrector: null
+      tier: nano
+
+  - opcode: <ABSTAIN>
+    id: control.abstain
+    canonical_token: <OP_CTRL_ABSTAIN>
+    symbol: "abstain"
+    kind: non_math_control
+    domain: control
+    type_signature: "Input -> Abstain"
+    primitive: true
+    implementation_mode: unit
+    priority: S1
+    evaluator_fn: eval_abstain
+    default_unit:
+      main_model: AbstainUnit
+      corrector: GateCorrector
+      tier: nano
+
+future_operator_policy:
+  prefer_program_for_derived: true
+  prefer_reserved_slots_for_new_primitives: true
+  prefer_fallback_for_unstable_semantic_or_tool_ops: true
+  tokenizer_major_bump_required_if_no_reserved_slot_applies: true
+
+required_checkpoint_metadata:
+  - operator_id
+  - opcode
+  - tokenizer_profile
+  - vocab_hash
+  - implementation_mode
+  - unit_tier
+  - train_generator
+  - negative_generator
+  - metrics
+
+core_metrics:
+  - single_accuracy
+  - fusion_accuracy
+  - active_gate_mean
+  - inactive_gate_mean
+  - inactive_leakage_mean
+  - inactive_leakage_p95
+  - false_neutral_rate
+  - invalid_entropy_norm
+  - invalid_pmax
+  - short_mixed_leakage
+  - length_ood_accuracy
+  - depth_ood_accuracy
