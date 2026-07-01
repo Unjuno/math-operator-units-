@@ -1,8 +1,8 @@
 # Logit Bias Semantics
 
-This repository is not primarily about building a neural calculator, a faster router, or a replacement for symbolic computation.
+This repository is not primarily about building a neural calculator, a faster router, keyword-based mode switching, or a replacement for symbolic computation.
 
-The core goal is to define and test a semantics for model control in logit space.
+The core goal is to define and test a semantics for model control in logit space, especially when multiple model or unit outputs are produced in parallel over the same sequence context.
 
 ## 1. Central object
 
@@ -14,19 +14,37 @@ z_0(v | x)
 
 for token `v` in vocabulary `V` and context `x`.
 
-A control direction is represented as a bias field:
+A parallel model or unit produces:
 
 ```text
-B(v | x) ∈ R^{|V|}
+z_i(v | x)
+```
+
+A control direction can be represented as a bias field:
+
+```text
+B_i(v | x) = z_i(v | x) - z_0(v | x)
+```
+
+or as an already centered field:
+
+```text
+B_i(v | x) ∈ R^{|V|}
 ```
 
 The controlled distribution is:
 
 ```text
-p_B(v | x) = softmax(z_0(v | x) + λ B(v | x))
+p_F(v | x) = softmax(z_0(v | x) + λ F(v | x))
 ```
 
-The semantic object is not a single token or a single answer. The semantic object is the induced distributional change caused by the bias field.
+where:
+
+```text
+F(v | x) = O(B_1, B_2, ..., B_n)(v | x)
+```
+
+The semantic object is not a single token or a single answer. The semantic object is the induced distributional change caused by the computed control field.
 
 ## 2. Meaning of a bias field
 
@@ -35,13 +53,13 @@ A bias field has meaning through its effect.
 Distributional effect:
 
 ```text
-Δp_B = softmax(z_0 + B) - softmax(z_0)
+Δp_F = softmax(z_0 + F) - softmax(z_0)
 ```
 
 Verifier effect:
 
 ```text
-ΔV(B) = E_{y ~ p_B}[V(y)] - E_{y ~ p_0}[V(y)]
+ΔV(F) = E_{y ~ p_F}[V(y)] - E_{y ~ p_0}[V(y)]
 ```
 
 where `V` is a verifier, reward model, constraint checker, evaluator, or task-specific scoring function.
@@ -83,12 +101,6 @@ Interpretation:
 
 ```text
 apply both control directions
-```
-
-Example:
-
-```text
-truthfulness_bias + conciseness_bias
 ```
 
 ### 4.2 Difference
@@ -156,58 +168,68 @@ the part of a desired control effect not explained by known bias operators
 
 Residuals are not automatically meaningful. They require stability, verifier support, and repeated evidence across samples.
 
-## 5. Corrected bias semantics
+## 5. Contribution-controlled bias semantics
 
 Raw learned modules are not assumed to be neutral outside their training domain.
 
-A corrected bias is:
+The general contribution-controlled form is token-wise:
 
 ```text
-B_tilde_k(v | x) = g_k(x) B_k(v | x)
+F(v | x) = Σ_i c_i(v | x) B_i(v | x)
 ```
 
-where `g_k(x)` is an applicability corrector or semantic-domain gate.
+where:
+
+```text
+c_i(v | x) ∈ [0, 1]
+```
+
+A lower-rank scalar-gate approximation is:
+
+```text
+F(v | x) = Σ_i g_i(x) B_i(v | x)
+```
 
 Interpretation:
 
 ```text
-B_k has semantic force only when g_k(x) says the field is applicable.
+corrector = contribution controller over a bias field
 ```
 
-This is not merely an accuracy trick. The corrector defines the context-dependent domain on which the bias field is allowed to contribute.
+The corrector is not primarily a parser-based symbolic operator selector. It decides how much of a parallel bias field is allowed to affect the same-prefix next-token distribution.
 
-Without this gate, raw fusion can assign semantic meaning to irrelevant, out-of-domain, or assimilated bias outputs.
+Without this control, direct summation can assign semantic force to irrelevant, out-of-domain, or assimilated bias outputs.
 
-## 6. Relation to mode-switched fusion
+## 6. Relation to runtime sets
 
-Mode switching is a runtime mechanism, not the primary research objective.
+Runtime sets are an engineering mechanism, not the primary semantics.
 
-Mode switching selects a candidate fusion set:
+A runtime set chooses which fields are available:
 
 ```text
-S_mode ⊂ registry
+S_runtime ⊂ registry
 ```
 
-Correctors decide which selected units actually contribute:
+Contribution controllers decide how those available fields affect the final distribution:
 
 ```text
-z_final = z_0 + Σ_{k in S_mode} g_k(x) B_k(v | x)
+z_final(v | x) = z_0(v | x) + Σ_{k in S_runtime} c_k(v | x) B_k(v | x)
 ```
 
 Thus:
 
 ```text
-mode selector:
-  chooses candidate control fields
+runtime set:
+  chooses candidate parallel fields
 
 corrector:
-  gates semantic applicability
+  controls contribution to the same-prefix distribution
 
 fusion:
-  composes the corrected fields
+  composes the controlled fields
 ```
 
-The goal is not to route to one expert. The goal is to compose multiple corrected control directions.
+The goal is not keyword-based mode switching and not routing to one expert. The goal is to transform and compose multiple parallel control fields over the same sequence prefix.
 
 ## 7. Why math is used as a proxy
 
@@ -222,7 +244,7 @@ They are useful because:
 4. wrong compositions can be constructed deliberately
 5. softmax distribution effects can be measured
 6. inactive leakage and OOD peakedness can be measured
-7. corrector-gated fusion can be compared against raw fusion
+7. contribution-controlled fusion can be compared against direct summation
 ```
 
 The point is not that addition is useful by itself. The point is to test whether learned operator modules preserve interpretable logit-space effects under composition.
@@ -232,6 +254,7 @@ The point is not that addition is useful by itself. The point is to test whether
 ```text
 not a replacement for symbolic computation
 not primarily a calculator
+not keyword-based mode switching
 not a claim that LLM fusion automatically works
 not a claim that raw bias addition is safe
 not a standard MoE router
@@ -240,7 +263,7 @@ not a standard MoE router
 ## 9. What this project is
 
 ```text
-a controlled study of logit-space semantics for model control
+a controlled study of same-prefix parallel logit-space bias control
 ```
 
 More specifically:
@@ -248,8 +271,8 @@ More specifically:
 ```text
 human-defined bias operators
 + automatically generated supervision
-+ small operator-specific modules
-+ applicability correctors
++ parallel model/unit outputs
++ contribution controllers
 + external operator graphs
 + softmax/verifier effect measurement
 ```
@@ -257,12 +280,12 @@ human-defined bias operators
 ## 10. Minimal research claim
 
 ```text
-Learned bias modules should not be treated as safely composable by raw addition. They become meaningful compositional control units only when their logit-space effects are typed, measured, and gated by applicability correctors.
+Learned bias modules should not be treated as safely composable by raw addition. They become meaningful compositional control units only when their logit-space effects are typed, measured, and controlled as contributions to the same-prefix next-token distribution.
 ```
 
 Japanese:
 
 ```text
 学習済みbias moduleは、生の加算だけで安全に合成できるとは仮定しない。
-それらは、logit空間上の効果が型付けされ、測定され、適用性補正器でgateされたときに初めて、意味を持つ合成可能な制御単位になる。
+それらは、logit空間上の効果が型付けされ、測定され、同じ系列prefixの次token分布への寄与として制御されたときに初めて、意味を持つ合成可能な制御単位になる。
 ```
