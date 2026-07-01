@@ -1,0 +1,156 @@
+tokenizer:
+  name: ouf_core_tokenizer
+  profile: tokenizer_core_v1
+  version: 1.0.0
+  compatibility: fixed_vocab
+  breaking_change_policy: major_version_only
+
+policy:
+  token_ids_are_model_abi: true
+  allow_vocab_growth_within_major_version: false
+  allow_reserved_slot_assignment: true
+  require_vocab_hash_for_checkpoints: true
+  require_matching_vocab_hash_for_fusion: true
+
+special_tokens:
+  - <PAD>
+  - <BOS>
+  - <EOS>
+  - <UNK>
+  - <MASK>
+  - <SEP>
+  - <OUT>
+  - <ERR>
+  - <ABSTAIN>
+  - <NOOP>
+
+structural_tokens:
+  - <LPAREN>
+  - <RPAREN>
+  - <LBRACK>
+  - <RBRACK>
+  - <LBRACE>
+  - <RBRACE>
+  - <COMMA>
+  - <COLON>
+  - <SEMICOLON>
+  - <ASSIGN>
+  - <ARROW>
+  - <PIPE>
+
+register_tokens:
+  range: <X0>..<X255>
+  named:
+    - <A>
+    - <B>
+    - <C>
+    - <D>
+    - <U>
+    - <V>
+    - <W>
+    - <OUT_VAR>
+
+type_tokens:
+  - <T_SCALAR>
+  - <T_INT>
+  - <T_REAL>
+  - <T_BOOL>
+  - <T_VECTOR>
+  - <T_MATRIX>
+  - <T_TENSOR>
+  - <T_SET>
+  - <T_FUNCTION>
+  - <T_FIELD>
+  - <T_DISTRIBUTION>
+  - <T_BIAS>
+  - <T_TEXT>
+  - <T_DOCS>
+  - <T_TOOL_RESULT>
+
+numeric_tokens:
+  atomic_integer_range:
+    min: -512
+    max: 512
+    format: <N_{value}>
+  optional_digit_tokens:
+    enabled: true
+    tokens:
+      - <SIGN_PLUS>
+      - <SIGN_MINUS>
+      - <DIGIT_0>
+      - <DIGIT_1>
+      - <DIGIT_2>
+      - <DIGIT_3>
+      - <DIGIT_4>
+      - <DIGIT_5>
+      - <DIGIT_6>
+      - <DIGIT_7>
+      - <DIGIT_8>
+      - <DIGIT_9>
+      - <DECIMAL>
+      - <FRAC_BAR>
+      - <EXP_MARK>
+
+operator_namespaces:
+  - <OP_SCALAR_*>
+  - <OP_COMPARE_*>
+  - <OP_AGG_*>
+  - <OP_LOGIC_*>
+  - <OP_SET_*>
+  - <OP_NUMTHEORY_*>
+  - <OP_LINALG_*>
+  - <OP_CALC_*>
+  - <OP_PROB_*>
+  - <OP_BIAS_*>
+  - <OP_OPT_*>
+  - <OP_PDE_*>
+  - <OP_CTRL_*>
+  - <OP_SEM_*>
+  - <OP_TOOL_*>
+
+core_operator_tokens:
+  scalar:
+    - <OP_SCALAR_ZERO>
+    - <OP_SCALAR_ONE>
+    - <OP_SCALAR_CONST>
+    - <OP_SCALAR_ID>
+    - <OP_SCALAR_NEG>
+    - <OP_SCALAR_ADD>
+    - <OP_SCALAR_ABS>
+    - <OP_SCALAR_POS>
+    - <OP_SCALAR_MIN>
+    - <OP_SCALAR_MAX>
+  bias:
+    - <OP_BIAS_ADD>
+    - <OP_BIAS_SUB>
+    - <OP_BIAS_CENTER>
+    - <OP_BIAS_SCALE>
+    - <OP_BIAS_POS>
+  control:
+    - <OP_CTRL_GATE>
+    - <OP_CTRL_SUPPRESS>
+    - <OP_CTRL_ABSTAIN>
+
+reserved_operator_slots:
+  count: 4096
+  format: <OP_RESERVED_{index:04d}>
+  first: <OP_RESERVED_0000>
+  last: <OP_RESERVED_4095>
+  assignment_policy:
+    once_assigned_never_reassign: true
+    record_assignment_in_registry_history: true
+
+fallback:
+  byte_tokens: true
+  operator_spelling_tokens:
+    - <OP_START>
+    - <OP_END>
+
+ci_checks:
+  - no_duplicate_token_strings
+  - no_duplicate_token_ids
+  - registry_operator_tokens_exist_in_vocab
+  - program_only_operators_do_not_require_direct_tokens
+  - reserved_token_assignment_is_unique
+  - checkpoints_declare_tokenizer_hash
+  - fusion_rejects_mismatched_tokenizer_hash
