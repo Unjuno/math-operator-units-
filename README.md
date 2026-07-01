@@ -87,6 +87,7 @@ The mathematical operator experiments are controlled proxies for this goal. They
 - [`docs/parallel_sequence_bias_control.md`](docs/parallel_sequence_bias_control.md): same-prefix parallel model/unit outputs and bias-field control.
 - [`docs/generation_path_reliability_calibrator.md`](docs/generation_path_reliability_calibrator.md): generator + path reliability calibrator design.
 - [`docs/reliability_calibrator_training_plan.md`](docs/reliability_calibrator_training_plan.md): training plan for paired reliability calibrators.
+- [`docs/operator_ownership_complement_calibrator.md`](docs/operator_ownership_complement_calibrator.md): ownership classifier and complement-based attenuation.
 - [`docs/tokenizer_design.md`](docs/tokenizer_design.md): tokenizer and vocabulary policy.
 - [`docs/shared_numeric_equality_abi.md`](docs/shared_numeric_equality_abi.md): shared number/equality ABI policy for all units.
 - [`docs/equivalence_trace_training_plan.md`](docs/equivalence_trace_training_plan.md): equality trace data and anti-shortcut / anti-loop training policy.
@@ -195,3 +196,5 @@ Valid equivalence is not the same as useful progress. Equality traces must there
 - `path_reliability_auc`
 - `attenuation_precision`
 - `attenuation_recall`
+- `ownership_auc`
+- `ownership_complement_suppression_rate`
