@@ -266,6 +266,9 @@ def train_job(
     initial_payload = torch.load(initial_checkpoint, map_location=device, weights_only=False)
     model.load_state_dict(initial_payload["model_state_dict"])
     initial_state = {name: tensor.detach().cpu().clone() for name, tensor in initial_payload["model_state_dict"].items()}
+    # Reset stochastic training state after model construction/loading so every
+    # job in a seed uses a controlled, comparable dropout trajectory.
+    _set_seed(seed + 1_000_000, config.deterministic_algorithms)
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
