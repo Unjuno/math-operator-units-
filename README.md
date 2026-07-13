@@ -13,7 +13,7 @@ The immediate goal is to manufacture the model set required for the next fusion 
 5. `scalar.max`
 6. `joint.all_five`, trained on the balanced union of all five operator datasets
 
-The five independent units define 32 runtime subsets, including the empty/base subset. The batch runner writes all 32 subset manifests after the six checkpoints for a seed are complete.
+The five independent units define 32 runtime subsets, including the empty/base subset. The batch runner writes all 32 subset manifests after the six checkpoints for a seed are complete. It also writes checkpoint-aligned 32-subset grids at every training step shared by all six jobs.
 
 The factory is deliberately GPT-only. It does not train perceptron, linear, MLP, router, or calibrator models. Reliability calibration remains in the repository as a later ablation, but it is not a prerequisite for generating the operator checkpoints.
 
@@ -68,7 +68,15 @@ Detached:
 bash scripts/run_operator_factory_cuda.sh configs/experiments/gpt_operator_factory_v1.yaml detach
 ```
 
-Direct CLI:
+The launcher performs three checks before starting the long run:
+
+1. CUDA availability and device reporting;
+2. the complete unit-test suite;
+3. a three-step CUDA smoke batch covering all five units and the joint model.
+
+Set `SKIP_SMOKE=1` only after the smoke batch has already passed on the same environment.
+
+Direct production CLI, without the launcher preflight:
 
 ```bash
 opfusion-train-batch --config configs/experiments/gpt_operator_factory_v1.yaml
@@ -97,10 +105,14 @@ runs/gpt_operator_factory_v1/
     ├── scalar_min/
     ├── scalar_max/
     ├── joint_all_five/
-    └── fusion_subsets/
-        ├── subset_00.json
+    ├── fusion_subsets/
+    │   ├── subset_00.json
+    │   ├── ...
+    │   ├── subset_31.json
+    │   └── index.json
+    └── fusion_checkpoint_grid/
+        ├── step_000000000/
         ├── ...
-        ├── subset_31.json
         └── index.json
 ```
 
