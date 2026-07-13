@@ -33,7 +33,7 @@ python -m venv .venv
 # An explicitly selected CUDA wheel channel must replace an existing CPU-only
 # installation as well as install into a fresh environment.
 if [[ -n "${TORCH_INDEX_URL:-}" ]]; then
-  .venv/bin/python -m pip install --upgrade torch --index-url "$TORCH_INDEX_URL"
+  .venv/bin/python -m pip install --upgrade --force-reinstall torch --index-url "$TORCH_INDEX_URL"
 elif ! .venv/bin/python -c 'import torch' >/dev/null 2>&1; then
   .venv/bin/python -m pip install torch
 fi
