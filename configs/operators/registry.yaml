@@ -2,6 +2,12 @@ registry_version: 1
 project: math-operator-units
 tokenizer_profile: tokenizer_core_v1
 
+model_profiles:
+  gpt_nano_v1:
+    model_class: GPTModel
+    config_path: configs/model/gpt_nano_v1.yaml
+    description: "GPT-style transformer decoder, d_model=64, n_layers=2, ~700K params"
+
 operator_kinds:
   - math_exact
   - math_numeric
@@ -32,8 +38,8 @@ operators:
     priority: S0
     evaluator_fn: eval_zero
     default_unit:
-      main_model: ConstantZeroUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
     required_metrics:
       - single_accuracy
@@ -52,8 +58,8 @@ operators:
     priority: S0
     evaluator_fn: eval_id
     default_unit:
-      main_model: LinearUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
   - opcode: <NEG>
@@ -68,8 +74,8 @@ operators:
     priority: S0
     evaluator_fn: eval_neg
     default_unit:
-      main_model: LinearUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
   - opcode: <ADD>
@@ -84,8 +90,8 @@ operators:
     priority: S0
     evaluator_fn: eval_add
     default_unit:
-      main_model: LinearUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
     negative_generators:
       - gen_type_mismatch
@@ -119,8 +125,8 @@ operators:
     priority: S0
     evaluator_fn: eval_abs
     default_unit:
-      main_model: MLPUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: micro
 
   - opcode: <POS>
@@ -135,8 +141,8 @@ operators:
     priority: S0
     evaluator_fn: eval_pos
     default_unit:
-      main_model: MLPUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: micro
 
   - opcode: <MIN>
@@ -151,8 +157,8 @@ operators:
     priority: S0
     evaluator_fn: eval_min
     default_unit:
-      main_model: MLPUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: micro
 
   - opcode: <MAX>
@@ -167,8 +173,8 @@ operators:
     priority: S0
     evaluator_fn: eval_max
     default_unit:
-      main_model: MLPUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: micro
 
   - opcode: <BIAS_ADD>
@@ -183,8 +189,8 @@ operators:
     priority: S0
     evaluator_fn: eval_bias_add
     default_unit:
-      main_model: LinearBiasUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
   - opcode: <BIAS_SUB>
@@ -199,8 +205,8 @@ operators:
     priority: S0
     evaluator_fn: eval_bias_sub
     default_unit:
-      main_model: LinearBiasUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
   - opcode: <BIAS_CENTER>
@@ -215,8 +221,8 @@ operators:
     priority: S0
     evaluator_fn: eval_bias_center
     default_unit:
-      main_model: LinearBiasUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
   - opcode: <BIAS_POS>
@@ -231,8 +237,8 @@ operators:
     priority: S0
     evaluator_fn: eval_bias_pos
     default_unit:
-      main_model: MLPBiasUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: micro
 
   - opcode: <GATE>
@@ -247,7 +253,7 @@ operators:
     priority: S0
     evaluator_fn: eval_gate_targets
     default_unit:
-      main_model: GateCorrector
+      model_profile: gpt_nano_v1
       corrector: null
       tier: nano
 
@@ -263,7 +269,7 @@ operators:
     priority: S0
     evaluator_fn: eval_suppress
     default_unit:
-      main_model: SuppressionUnit
+      model_profile: gpt_nano_v1
       corrector: null
       tier: nano
 
@@ -279,8 +285,8 @@ operators:
     priority: S1
     evaluator_fn: eval_abstain
     default_unit:
-      main_model: AbstainUnit
-      corrector: GateCorrector
+      model_profile: gpt_nano_v1
+      corrector_profile: gate_corrector
       tier: nano
 
 future_operator_policy:

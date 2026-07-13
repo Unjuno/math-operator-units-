@@ -1,0 +1,11 @@
+model:
+  vocab_size: 9666
+  d_model: 64
+  n_layers: 2
+  n_heads: 4
+  d_ff: 256
+  max_seq_len: 512
+  dropout: 0.1
+  weight_tying: true
+  bias: false
+  tokenizer_profile: tokenizer_core_v1
