@@ -40,7 +40,8 @@ def training_example_with_model_design(
     )
     # Rejection sampling is deterministic and preserves the underlying stable
     # IID partition. The weak base receives real operator targets only on a
-    # deliberately restricted operand/length domain.
+    # deliberately restricted operand/length domain. Keep the original task
+    # label so the exact verifier retains its terminal/full/continuation logic.
     for attempt in range(self.config.max_partition_attempts):
         candidate = _ORIGINAL_TRAINING_EXAMPLE(
             self,
@@ -55,11 +56,7 @@ def training_example_with_model_design(
             len(candidate.initial_values) <= design.base_weak_max_terms
             and all(abs(value) <= design.base_weak_operand_abs_max for value in candidate.initial_values)
         ):
-            return replace(
-                candidate,
-                job_id="base.common",
-                task=f"weak_multitask:{candidate.task}",
-            )
+            return replace(candidate, job_id="base.common")
     raise RuntimeError(
         "failed to sample a weak-multitask base example within the declared "
         f"operand/length limits for operator={operator_id}, split={split}"
