@@ -18,9 +18,11 @@ PILOT_WATCHER = Path("scripts/watch_model_design_pilot.sh")
 PILOT_STATUS = Path("scripts/status_model_design_pilot.sh")
 BATCH_DESIGN = Path("src/opfusion/training/batch_design.py")
 HARDENED_TRAINER = Path("src/opfusion/training/trainer_design_hardened.py")
+SEEDED_EVALUATOR = Path("src/opfusion/fusion_eval_seeded.py")
 UNIT_DIAGNOSTICS = Path("src/opfusion/fusion_diagnostics.py")
 PAIR_AUDIT = Path("src/opfusion/training/audit_pilot_pairs.py")
 EXPERIMENT_CONTRACT = Path("src/opfusion/training/experiment_contract.py")
+PYPROJECT = Path("pyproject.toml")
 LEGACY_V3_LAUNCHER = Path("scripts/run_bias_fusion_factory_surface_v3.sh")
 TYPED_V2_LAUNCHER = Path("scripts/run_bias_fusion_factory_v2.sh")
 ARCH_BOOTSTRAP = Path("scripts/bootstrap_arch_linux.sh")
@@ -148,16 +150,18 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
         pilot_status = _read(root, PILOT_STATUS)
         batch_design = _read(root, BATCH_DESIGN)
         hardened = _read(root, HARDENED_TRAINER)
+        seeded_evaluator = _read(root, SEEDED_EVALUATOR)
         diagnostics = _read(root, UNIT_DIAGNOSTICS)
         pair_audit = _read(root, PAIR_AUDIT)
         contract = _read(root, EXPERIMENT_CONTRACT)
+        pyproject = _read(root, PYPROJECT)
         bootstrap = _read(root, ARCH_BOOTSTRAP)
         runbook = _read(root, ARCH_RUNBOOK)
         legacy_v3 = _read(root, LEGACY_V3_LAUNCHER)
         typed_v2 = _read(root, TYPED_V2_LAUNCHER)
     except FileNotFoundError as exc:
         errors.append({"kind": "missing_operational_file", "path": str(exc)})
-        launcher = pilot = pilot_watcher = pilot_status = batch_design = hardened = diagnostics = pair_audit = contract = bootstrap = runbook = legacy_v3 = typed_v2 = ""
+        launcher = pilot = pilot_watcher = pilot_status = batch_design = hardened = seeded_evaluator = diagnostics = pair_audit = contract = pyproject = bootstrap = runbook = legacy_v3 = typed_v2 = ""
 
     check(str(PRIMARY_CONFIG) in launcher, "primary_launcher_default_config_mismatch")
     check("opfusion-train-batch-design" in launcher, "primary_launcher_uses_legacy_batch_runner")
@@ -168,9 +172,12 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
     check("watch_model_design_pilot.sh" in pilot, "pilot_detach_does_not_use_watchdog")
     check("status_model_design_pilot.sh" in pilot, "pilot_does_not_advertise_status_command")
     check("CUBLAS_WORKSPACE_CONFIG" in pilot, "pilot_missing_deterministic_cublas_workspace")
-    check("evaluation_splits=(validation operand_ood length_ood)" in pilot, "pilot_evaluation_split_contract_missing")
+    check("evaluation_splits=(validation)" in pilot, "pilot_evaluation_split_contract_missing")
+    declared_splits = pilot.split("evaluation_splits=", 1)[-1].split("for condition", 1)[0]
+    check("test" not in declared_splits, "pilot_consumes_reserved_iid_test")
+    check("operand_ood" not in declared_splits, "pilot_consumes_reserved_operand_ood")
+    check("length_ood" not in declared_splits, "pilot_consumes_reserved_length_ood")
     check("--split \"$split\"" in pilot, "pilot_does_not_iterate_declared_splits")
-    check("test" not in pilot.split("evaluation_splits=", 1)[-1].split("for condition", 1)[0], "pilot_consumes_reserved_iid_test")
     check("opfusion-evaluate-unit-diagnostics" in pilot, "pilot_missing_unit_diagnostics")
     check("opfusion-audit-pilot-pairs" in pilot, "pilot_missing_pair_consistency_audit")
     check("MAX_RESTARTS" in pilot_watcher, "pilot_watchdog_has_no_retry_limit")
@@ -178,14 +185,21 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
     check("pilot_state.json" in pilot_watcher, "pilot_watchdog_has_no_state_file")
     check("64|65|66|67|73" in pilot_watcher, "pilot_watchdog_retries_scientific_pair_failure")
     check("completed_models" in pilot_status, "pilot_status_omits_model_progress")
+    check("fusion_reports={reports}/1" in pilot_status, "pilot_status_report_count_mismatch")
     check("pair_consistency" in pilot_status, "pilot_status_omits_pair_consistency")
     check("trainer_design_hardened import train_job" in batch_design, "batch_design_bypasses_hardened_trainer")
     check("full_domain_inactive_retention" in hardened, "inactive_retention_not_full_domain")
     check("enable_flash_sdp(False)" in hardened, "deterministic_pilot_keeps_flash_attention")
+    check("DEFAULT_PILOT_EVALUATION_SEED" in seeded_evaluator, "seeded_evaluator_missing_pilot_namespace")
+    check("DEFAULT_FINAL_EVALUATION_SEED" in seeded_evaluator, "seeded_evaluator_missing_final_namespace")
+    check("evaluation_seed" in diagnostics, "unit_diagnostics_omit_evaluation_seed")
     check("inactive_summary" in diagnostics, "unit_diagnostics_missing_inactive_summary")
     check("paired_shared_endpoint_mismatch" in pair_audit, "pair_audit_missing_exact_state_check")
+    check("paired_specialist_runtime_mismatch" in pair_audit, "pair_audit_missing_runtime_warning")
     check("trainer_design_hardened.py" in contract, "fingerprint_omits_hardened_trainer")
+    check("fusion_eval_seeded.py" in contract, "fingerprint_omits_seeded_evaluator")
     check("fusion_diagnostics.py" in contract, "fingerprint_omits_unit_diagnostics")
+    check('opfusion-evaluate-fusion = "opfusion.fusion_eval_seeded:main"' in pyproject, "canonical_evaluator_bypasses_seed_recording")
     check("run_model_design_pilot.sh" in bootstrap, "bootstrap_does_not_advertise_pilot")
     check("gpt_bias_fusion_factory_surface_v4" in bootstrap, "bootstrap_omits_surface_v4")
     check("gpt_bias_fusion_factory_surface_v4" in runbook, "runbook_omits_surface_v4")
@@ -211,7 +225,7 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
         "shared_prefix_checks": shared_prefix_checks,
         "weak_base_checks": weak_base_checks,
         "pilot_configs": pilot_configs,
-        "pilot_final_iid_test_reserved": True,
+        "pilot_reserved_final_splits": ["iid_test", "operand_ood", "length_ood"],
         "data_audit_status": data_report["status"],
         "errors": errors,
         "warnings": warnings,
