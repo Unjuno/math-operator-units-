@@ -100,7 +100,8 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
         matched = _shared_prompt_schema(base, specialist)
         shared_prefix_checks[operator_id] = matched
         weak_ok = (
-            base.task.startswith("weak_multitask:")
+            base.job_id == "base.common"
+            and base.task in {"full_trace", "continuation", "terminal_stop"}
             and len(base.initial_values) <= design.base_weak_max_terms
             and all(abs(value) <= design.base_weak_operand_abs_max for value in base.initial_values)
         )
