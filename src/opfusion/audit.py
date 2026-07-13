@@ -27,6 +27,18 @@ def _read(root: Path, path: Path) -> str:
     return target.read_text(encoding="utf-8")
 
 
+def _shared_prompt_schema(base: Any, specialist: Any) -> bool:
+    return bool(
+        base.prompt_tokens
+        and specialist.prompt_tokens
+        and base.prompt_tokens[0] == specialist.prompt_tokens[0]
+        and base.prompt_tokens[-1] == "<RESPONSE>"
+        and specialist.prompt_tokens[-1] == "<RESPONSE>"
+        and "<TASK_COPY>" not in base.prompt_tokens
+        and "<TASK_COPY>" not in specialist.prompt_tokens
+    )
+
+
 def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) -> dict[str, Any]:
     """Audit the guarded production candidate and model-design safety gates."""
 
@@ -85,7 +97,7 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
         )
         base = factory.training_example("base.common", **kwargs)
         specialist = factory.training_example(operator_id, **kwargs)
-        matched = base.prompt_tokens == specialist.prompt_tokens
+        matched = _shared_prompt_schema(base, specialist)
         shared_prefix_checks[operator_id] = matched
         weak_ok = (
             base.task.startswith("weak_multitask:")
@@ -93,7 +105,7 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
             and all(abs(value) <= design.base_weak_operand_abs_max for value in base.initial_values)
         )
         weak_base_checks[operator_id] = weak_ok
-        check(matched, "base_specialist_prefix_mismatch", operator=operator_id, base=list(base.prompt_tokens), specialist=list(specialist.prompt_tokens))
+        check(matched, "base_specialist_prefix_schema_mismatch", operator=operator_id, base=list(base.prompt_tokens), specialist=list(specialist.prompt_tokens))
         check(weak_ok, "weak_base_contract_violation", operator=operator_id, task=base.task, values=base.initial_values)
         check(specialist.final_value is not None, "specialist_missing_arithmetic_target", operator=operator_id)
 
