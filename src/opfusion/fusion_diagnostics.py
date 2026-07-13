@@ -15,6 +15,10 @@ from opfusion.fusion_eval import (
     _teacher_forced_logits,
     center_logit_field,
 )
+from opfusion.fusion_eval_seeded import (
+    DEFAULT_FINAL_EVALUATION_SEED,
+    DEFAULT_PILOT_EVALUATION_SEED,
+)
 from opfusion.tokenizer import FixedVocabTokenizer
 from opfusion.training.config import load_run_config
 from opfusion.training.data import EXPERIMENT_OPERATORS, SyntheticTraceFactory
@@ -34,10 +38,20 @@ def evaluate_unit_diagnostics(
     split: str = "validation",
     examples_per_operator: int = 64,
     device_name: str = "auto",
+    evaluation_seed: int | None = None,
 ) -> dict[str, Any]:
     config_path = Path(config_path).resolve()
     repo_root = config_path.parents[2]
     run = load_run_config(config_path)
+    resolved_seed = (
+        DEFAULT_PILOT_EVALUATION_SEED
+        if evaluation_seed is None and run.experiment_id.startswith("model_design_pilot_")
+        else DEFAULT_FINAL_EVALUATION_SEED
+        if evaluation_seed is None
+        else evaluation_seed
+    )
+    if resolved_seed < 0:
+        raise ValueError("evaluation_seed must be nonnegative")
     tokenizer = FixedVocabTokenizer.from_config(repo_root / run.tokenizer_config)
     factory = SyntheticTraceFactory(tokenizer, run.data)
     manifest_path = Path(manifest_path).resolve()
@@ -84,7 +98,7 @@ def evaluate_unit_diagnostics(
             for sample_index in range(examples_per_operator):
                 example = factory.training_example(
                     target_operator,
-                    seed=710_000,
+                    seed=resolved_seed,
                     split=split,
                     step=target_index,
                     sample_index=sample_index,
@@ -156,6 +170,12 @@ def evaluate_unit_diagnostics(
         "experiment_fingerprint": manifest.get("experiment_fingerprint"),
         "split": split,
         "examples_per_operator": examples_per_operator,
+        "evaluation_seed": resolved_seed,
+        "evaluation_role": (
+            "model_design_development"
+            if resolved_seed == DEFAULT_PILOT_EVALUATION_SEED
+            else "final_or_user_selected"
+        ),
         "device": str(device),
         "metric_scope": "teacher-forced response positions on canonical target traces",
         "results": results,
@@ -170,6 +190,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--split", default="validation")
     parser.add_argument("--examples-per-operator", type=int, default=64)
+    parser.add_argument("--evaluation-seed", type=int)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--out")
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -178,6 +199,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         manifest_path=args.manifest,
         split=args.split,
         examples_per_operator=args.examples_per_operator,
+        evaluation_seed=args.evaluation_seed,
         device_name=args.device,
     )
     text = json.dumps(report, indent=2, sort_keys=True) + "\n"
