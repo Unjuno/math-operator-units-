@@ -13,6 +13,16 @@ AUDIT_DATA="${AUDIT_DATA:-$ROOT/.venv/bin/opfusion-audit-data}"
 MIN_FREE_GB="${MIN_FREE_GB:-15}"
 AUDIT_SAMPLES="${AUDIT_SAMPLES:-512}"
 
+if [[ "${OPFUSION_ALLOW_LEGACY_SURFACE_V3:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+surface-v3 is the legacy identity-base/unanchored condition and is no longer
+the default production design. Run the model-design pilot instead:
+  bash scripts/run_model_design_pilot.sh detach
+To reproduce the legacy condition explicitly, set OPFUSION_ALLOW_LEGACY_SURFACE_V3=1.
+EOF
+  exit 64
+fi
+
 if [[ ! -x "$PYTHON" || ! -x "$TRAIN_BATCH" || ! -x "$REPO_AUDIT" || ! -x "$AUDIT_DATA" ]]; then
   echo "virtual environment is missing or stale; run: bash scripts/bootstrap_arch_linux.sh" >&2
   exit 1
