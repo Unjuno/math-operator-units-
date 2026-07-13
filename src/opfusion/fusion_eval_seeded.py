@@ -26,7 +26,7 @@ def evaluate_manifest_seeded(
     *,
     config_path: str | Path,
     manifest_path: str | Path,
-    split: str = "test",
+    split: str = "iid_test",
     examples_per_operator: int = 64,
     max_new_tokens: int = 256,
     alpha: float = 1.0,
@@ -61,7 +61,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     )
     parser.add_argument("--config", default="configs/experiments/gpt_bias_fusion_factory_surface_v3.yaml")
     parser.add_argument("--manifest", required=True)
-    parser.add_argument("--split", default="test")
+    parser.add_argument("--split", default="iid_test")
     parser.add_argument("--examples-per-operator", type=int, default=64)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--alpha", type=float, default=1.0)
