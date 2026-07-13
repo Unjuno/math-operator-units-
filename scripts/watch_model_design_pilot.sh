@@ -69,13 +69,24 @@ cleanup_pid() {
 
 attempt=0
 child_pid=""
+child_is_process_group=0
+stop_worker() {
+  if [[ -z "$child_pid" ]] || ! kill -0 "$child_pid" 2>/dev/null; then
+    return
+  fi
+  if [[ "$child_is_process_group" == "1" ]]; then
+    kill -TERM -- "-$child_pid" 2>/dev/null || true
+  else
+    pkill -TERM -P "$child_pid" 2>/dev/null || true
+    kill -TERM "$child_pid" 2>/dev/null || true
+  fi
+  wait "$child_pid" 2>/dev/null || true
+}
+
 on_signal() {
   local signal="$1"
   echo "received ${signal}; stopping pilot worker" >&2
-  if [[ -n "$child_pid" ]] && kill -0 "$child_pid" 2>/dev/null; then
-    kill -TERM "$child_pid" 2>/dev/null || true
-    wait "$child_pid" 2>/dev/null || true
-  fi
+  stop_worker
   write_watch_state interrupted "$attempt" "watchdog received ${signal}"
   cleanup_pid
   exit 130
@@ -89,12 +100,20 @@ while true; do
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] model-design pilot attempt ${attempt}/${MAX_RESTARTS}"
   write_watch_state running "$attempt" "starting or resuming the four-condition pilot"
 
-  env OPFUSION_PILOT_CHILD=1 OPFUSION_PILOT_WATCHED=1 \
-    bash "$WORKER" foreground &
+  if command -v setsid >/dev/null 2>&1; then
+    setsid env OPFUSION_PILOT_CHILD=1 OPFUSION_PILOT_WATCHED=1 \
+      bash "$WORKER" foreground &
+    child_is_process_group=1
+  else
+    env OPFUSION_PILOT_CHILD=1 OPFUSION_PILOT_WATCHED=1 \
+      bash "$WORKER" foreground &
+    child_is_process_group=0
+  fi
   child_pid=$!
   wait "$child_pid"
   status=$?
   child_pid=""
+  child_is_process_group=0
 
   if [[ $status -eq 0 ]]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] model-design pilot completed"
