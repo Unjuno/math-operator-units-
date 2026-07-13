@@ -13,7 +13,18 @@ import torch
 def _floating_state(path: Path) -> dict[str, torch.Tensor]:
     payload = torch.load(path, map_location="cpu", weights_only=False)
     state = payload["model_state_dict"]
-    return {name: tensor.double().reshape(-1) for name, tensor in state.items() if torch.is_floating_point(tensor)}
+    output: dict[str, torch.Tensor] = {}
+    for name, tensor in state.items():
+        if not torch.is_floating_point(tensor):
+            continue
+        if (
+            name == "lm_head.weight"
+            and "token_embedding.weight" in state
+            and torch.equal(tensor, state["token_embedding.weight"])
+        ):
+            continue
+        output[name] = tensor.double().reshape(-1)
+    return output
 
 
 def _distance(a: dict[str, torch.Tensor], b: dict[str, torch.Tensor]) -> tuple[float, float]:
