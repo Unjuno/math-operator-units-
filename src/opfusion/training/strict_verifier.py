@@ -1,8 +1,45 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Sequence
 
 from .data import SyntheticTraceFactory, TrainingExample
+
+
+_ORIGINAL_TRAINING_EXAMPLE = SyntheticTraceFactory.training_example
+
+
+def training_example_shared_prefix(
+    self: SyntheticTraceFactory,
+    job_id: str,
+    *,
+    seed: int,
+    split: str,
+    step: int,
+    sample_index: int,
+    forced_operator: str | None = None,
+) -> TrainingExample:
+    """Use the production operator prefix for the common base as well.
+
+    The original v2 implementation inserted ``<TASK_COPY>`` only for
+    ``base.common``. That made ``z_base(x)`` and ``z_specialist(x)`` depend on
+    different prompt schemas during training. The common base still learns the
+    neutral identity target ``x = x``, but now sees exactly the same
+    ``<OP_*> expression <RESPONSE>`` prefix as every specialist.
+    """
+
+    example = _ORIGINAL_TRAINING_EXAMPLE(
+        self,
+        job_id,
+        seed=seed,
+        split=split,
+        step=step,
+        sample_index=sample_index,
+        forced_operator=forced_operator,
+    )
+    if job_id == "base.common" and example.prompt_tokens and example.prompt_tokens[0] == "<TASK_COPY>":
+        return replace(example, prompt_tokens=example.prompt_tokens[1:])
+    return example
 
 
 def verify_generated_ids_strict(
@@ -158,5 +195,12 @@ def verify_generated_ids_strict(
     }
 
 
-def install_strict_verifier() -> None:
+def install_training_contract() -> None:
+    SyntheticTraceFactory.training_example = training_example_shared_prefix  # type: ignore[method-assign]
     SyntheticTraceFactory.verify_generated_ids = verify_generated_ids_strict  # type: ignore[method-assign]
+
+
+def install_strict_verifier() -> None:
+    """Backward-compatible installation name."""
+
+    install_training_contract()

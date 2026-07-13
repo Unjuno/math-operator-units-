@@ -3,6 +3,23 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+if [[ "${OPFUSION_ALLOW_TYPED_V2:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+The typed-token v2 factory is a diagnostic ablation, not the canonical
+production experiment. It predicts experiment-specific <EQ_STEP> and
+<TRACE_STOP> output classes.
+
+Canonical production command:
+  bash scripts/run_bias_fusion_factory_surface_v3.sh \
+    configs/experiments/gpt_bias_fusion_factory_surface_v3.yaml \
+    detach
+
+To run typed v2 deliberately, set OPFUSION_ALLOW_TYPED_V2=1.
+EOF
+  exit 2
+fi
+
 CONFIG="${1:-configs/experiments/gpt_bias_fusion_factory_v2.yaml}"
 MODE="${2:-foreground}"
 SMOKE_CONFIG="${SMOKE_CONFIG:-configs/experiments/gpt_bias_fusion_factory_v2_smoke.yaml}"
@@ -43,7 +60,7 @@ fi
 "$TRAIN_BATCH" --config "$CONFIG" --plan-only
 
 if [[ "${SKIP_SMOKE:-0}" != "1" ]]; then
-  echo "Running v2 CUDA smoke batch..."
+  echo "Running typed-v2 CUDA smoke batch..."
   if [[ "${KEEP_SMOKE:-0}" != "1" ]]; then
     rm -rf runs/gpt_bias_fusion_factory_v2_smoke
   fi
@@ -53,16 +70,16 @@ fi
 mkdir -p logs runs/gpt_bias_fusion_factory_v2
 WATCH=(bash scripts/watch_bias_fusion_factory_v2.sh "$CONFIG")
 if command -v systemd-inhibit >/dev/null 2>&1; then
-  WATCH=(systemd-inhibit --what=sleep:shutdown --why="bias fusion model factory" --mode=block "${WATCH[@]}")
+  WATCH=(systemd-inhibit --what=sleep:shutdown --why="typed v2 bias fusion ablation" --mode=block "${WATCH[@]}")
 fi
 
 if [[ "$MODE" == "detach" ]]; then
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  log="logs/bias_fusion_factory_${stamp}.log"
+  log="logs/bias_fusion_factory_v2_${stamp}.log"
   nohup "${WATCH[@]}" >"$log" 2>&1 &
   pid=$!
   echo "$pid" > runs/gpt_bias_fusion_factory_v2/batch.pid
-  echo "started watchdog PID $pid; log: $log"
+  echo "started typed-v2 watchdog PID $pid; log: $log"
 else
   exec "${WATCH[@]}"
 fi

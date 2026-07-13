@@ -57,10 +57,15 @@ PY
 cat <<'EOF'
 Setup complete.
 
-Production launch:
-  bash scripts/run_bias_fusion_factory_v2.sh configs/experiments/gpt_bias_fusion_factory_v2.yaml detach
+Canonical production launch:
+  bash scripts/run_bias_fusion_factory_surface_v3.sh \
+    configs/experiments/gpt_bias_fusion_factory_surface_v3.yaml \
+    detach
 
-The launcher performs tests and a CUDA smoke run before starting. On Arch,
-verify `nvidia-smi` after every kernel/driver update. The script does not assume
-Ubuntu packages or apt.
+The launcher performs repository tests, generated-data audit, plan validation,
+and a CUDA smoke run before starting. The typed-token v2 launcher is an
+explicit diagnostic ablation and is not the default production path.
+
+On Arch Linux, verify `nvidia-smi` after every kernel/driver update. The script
+does not assume Ubuntu packages or apt.
 EOF

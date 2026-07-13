@@ -19,6 +19,9 @@ from .trainer import (
 )
 
 
+FULL_SUBSET_MASK = (1 << len(EXPERIMENT_OPERATORS)) - 1
+
+
 def _subset_record(
     *,
     mask: int,
@@ -30,7 +33,15 @@ def _subset_record(
 ) -> dict[str, Any]:
     active = [operator for bit, operator in enumerate(EXPERIMENT_OPERATORS) if mask & (1 << bit)]
     base = base_checkpoint or initial
+    has_matched_joint = mask == FULL_SUBSET_MASK
+    if has_matched_joint:
+        reference_status = "matched_all_five"
+    elif mask == 0:
+        reference_status = "base_only"
+    else:
+        reference_status = "not_trained_for_subset"
     return {
+        "manifest_version": 2,
         "subset_id": f"subset_{mask:02d}",
         "bitmask": mask,
         "operators": active,
@@ -42,7 +53,17 @@ def _subset_record(
         "base_checkpoint": str(base),
         "bias_definition": "specialist_logits - base_logits",
         "unit_checkpoints": {operator: str(checkpoints[operator]) for operator in active},
-        "joint_reference_checkpoint": str(joint_checkpoint),
+        # Compatibility field: it is populated only when the trained joint is
+        # actually matched to this subset. The all-five joint is not a valid
+        # reference for arbitrary intermediate subsets.
+        "joint_reference_checkpoint": str(joint_checkpoint) if has_matched_joint else None,
+        "joint_reference_status": reference_status,
+        "available_all_five_joint_checkpoint": str(joint_checkpoint),
+        "claim_boundary": (
+            "may_compare_fusion_to_matched_joint"
+            if has_matched_joint
+            else "diagnostic_only_without_subset_matched_joint"
+        ),
     }
 
 
@@ -68,7 +89,15 @@ def _write_subset_directory(
         )
         _json_dump(target / f"subset_{mask:02d}.json", record)
         records.append(record)
-    _json_dump(target / "index.json", {"count": len(records), "subsets": records})
+    _json_dump(
+        target / "index.json",
+        {
+            "manifest_version": 2,
+            "count": len(records),
+            "matched_joint_subsets": [record["subset_id"] for record in records if record["joint_reference_checkpoint"]],
+            "subsets": records,
+        },
+    )
     return target / "index.json"
 
 
@@ -130,8 +159,12 @@ def _write_seed_manifests(repo_root: Path, config: RunConfig, seed: int, final_c
         "base_checkpoint": str(base),
         "specialists": {operator: str(final_checkpoints[operator]) for operator in EXPERIMENT_OPERATORS},
         "joint_references": {job: str(final_checkpoints[job]) for job in config.joint_model_ids},
+        "joint_reference_scope": {
+            config.primary_joint_model_id: list(EXPERIMENT_OPERATORS),
+        },
         "trained_model_count": len(config.jobs),
         "runtime_subset_count": 1 << len(EXPERIMENT_OPERATORS),
+        "matched_joint_subset_count": 1,
         "checkpoint_steps": list(config.resolved_checkpoint_steps),
         "tokenizer_profile": tokenizer.profile,
         "vocab_hash": tokenizer.vocab_hash,
@@ -154,6 +187,7 @@ def _plan(config: RunConfig) -> dict[str, Any]:
         "trained_models_per_seed": len(config.jobs),
         "total_trained_models": len(config.jobs) * len(config.seeds),
         "runtime_subsets_per_seed": 1 << len(EXPERIMENT_OPERATORS),
+        "matched_joint_subsets_per_seed": 1,
         "max_steps_per_model": config.max_steps,
         "checkpoint_steps": list(config.resolved_checkpoint_steps),
         "logical_checkpoints_per_model": len(config.resolved_checkpoint_steps),
@@ -162,6 +196,9 @@ def _plan(config: RunConfig) -> dict[str, Any]:
         "equivalent_specialist_steps": config.max_steps
         * len(config.seeds)
         * sum(exposure_multiplier.values()),
+        "claim_boundary": (
+            "only the all-five subset has a matched joint reference; intermediate subsets are diagnostic unless a joint.S model is trained"
+        ),
         "note": "wall-clock duration is measured on the target GPU during smoke/probe; it is not guaranteed by this static plan",
     }
 
