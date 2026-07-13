@@ -7,6 +7,8 @@ PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
 WORKER="${WORKER:-$ROOT/scripts/run_model_design_pilot.sh}"
 MAX_RESTARTS="${MAX_RESTARTS:-20}"
 RESTART_DELAY_SECONDS="${RESTART_DELAY_SECONDS:-60}"
+STALL_TIMEOUT_SECONDS="${STALL_TIMEOUT_SECONDS:-21600}"
+STALL_CHECK_SECONDS="${STALL_CHECK_SECONDS:-300}"
 LOCK_FILE="${LOCK_FILE:-$ROOT/runs/model_design_pilot/pilot.lock}"
 STATE_FILE="${STATE_FILE:-$ROOT/runs/model_design_pilot/pilot_state.json}"
 PID_FILE="${PID_FILE:-$ROOT/runs/model_design_pilot/pilot.pid}"
@@ -17,6 +19,10 @@ exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "another model-design pilot holds $LOCK_FILE" >&2
   exit 73
+fi
+if ! [[ "$MAX_RESTARTS" =~ ^[1-9][0-9]*$ && "$RESTART_DELAY_SECONDS" =~ ^[0-9]+$ && "$STALL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ && "$STALL_CHECK_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "watchdog timing values must be nonnegative/positive integers" >&2
+  exit 64
 fi
 
 write_watch_state() {
@@ -110,8 +116,31 @@ while true; do
     child_is_process_group=0
   fi
   child_pid=$!
-  wait "$child_pid"
-  status=$?
+  stalled=0
+
+  if [[ -n "$PILOT_LOG" ]]; then
+    while kill -0 "$child_pid" 2>/dev/null; do
+      sleep "$STALL_CHECK_SECONDS"
+      if ! kill -0 "$child_pid" 2>/dev/null; then
+        break
+      fi
+      now="$(date +%s)"
+      last_activity="$(stat -c %Y "$PILOT_LOG" 2>/dev/null || echo "$now")"
+      if (( now - last_activity >= STALL_TIMEOUT_SECONDS )); then
+        echo "pilot log has not advanced for ${STALL_TIMEOUT_SECONDS}s; restarting worker" >&2
+        write_watch_state restarting "$attempt" "stall timeout after ${STALL_TIMEOUT_SECONDS}s without log progress"
+        stop_worker
+        status=124
+        stalled=1
+        break
+      fi
+    done
+  fi
+
+  if [[ "$stalled" == "0" ]]; then
+    wait "$child_pid"
+    status=$?
+  fi
   child_pid=""
   child_is_process_group=0
 
