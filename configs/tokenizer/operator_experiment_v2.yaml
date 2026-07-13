@@ -1,7 +1,7 @@
 tokenizer:
   name: operator_experiment_tokenizer
-  profile: operator_experiment_v2
-  version: 2.0.0
+  profile: operator_experiment_v2_1_natural_surface
+  version: 2.1.0
   compatibility: fixed_vocab
 
 policy:
@@ -9,6 +9,7 @@ policy:
   allow_vocab_growth: false
   reserved_or_blank_tokens: false
   require_vocab_hash_for_checkpoints: true
+  generated_control_surface: ordinary_symbols
 
 special_tokens:
   - <PAD>
@@ -17,14 +18,14 @@ special_tokens:
   - <UNK>
   - <RESPONSE>
   - <TASK_COPY>
-  - <EQ_STEP>
-  - <TRACE_STOP>
 
 structural_tokens:
-  - <PLUS>
-  - <COMMA>
-  - <LBRACK>
-  - <RBRACK>
+  - "="
+  - "+"
+  - ","
+  - "["
+  - "]"
+  - ":"
 
 type_tokens: []
 
