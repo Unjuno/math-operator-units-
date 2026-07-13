@@ -59,8 +59,8 @@ def audit_repo(repo_root: str | Path, *, data_samples_per_operator: int = 32) ->
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
 
-    def check(condition: bool, kind: str, **details: Any) -> None:
-        if not condition:
+    def check(ok: bool, kind: str, **details: Any) -> None:
+        if not ok:
             errors.append({"kind": kind, **details})
 
     config_path = root / PRIMARY_CONFIG
