@@ -41,6 +41,13 @@ def _selected_checkpoint(repo_root: Path, root: Path, condition: str, job_id: st
     return path, payload
 
 
+def _update_tensor_bytes(digest: Any, tensor: torch.Tensor, *, chunk_bytes: int = 1 << 20) -> None:
+    flat = tensor.detach().cpu().contiguous().view(torch.uint8).flatten()
+    for start in range(0, int(flat.numel()), chunk_bytes):
+        chunk = flat[start : start + chunk_bytes]
+        digest.update(bytes(chunk.tolist()))
+
+
 def _state_hash(checkpoint: Path) -> str:
     payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
     state = payload.get("model_state_dict")
@@ -48,21 +55,27 @@ def _state_hash(checkpoint: Path) -> str:
         raise RuntimeError(f"model_state_dict missing: {checkpoint}")
     digest = hashlib.sha256()
     for name in sorted(state):
-        tensor = state[name].detach().cpu().contiguous()
+        tensor = state[name]
+        if not isinstance(tensor, torch.Tensor):
+            raise RuntimeError(f"non-tensor model state entry {name!r}: {checkpoint}")
         digest.update(name.encode("utf-8"))
         digest.update(str(tensor.dtype).encode("ascii"))
         digest.update(json.dumps(list(tensor.shape)).encode("ascii"))
-        digest.update(tensor.view(torch.uint8).numpy().tobytes())
+        _update_tensor_bytes(digest, tensor)
     return digest.hexdigest()
 
 
-def _runtime_microbatch(root: Path, condition: str, job_id: str) -> int | None:
+def _runtime_state(root: Path, condition: str, job_id: str) -> dict[str, Any]:
     path = _job_dir(root, condition, job_id) / "runtime_state.json"
     if not path.is_file():
-        return None
+        return {}
     payload = json.loads(path.read_text(encoding="utf-8"))
-    value = payload.get("micro_batch_size")
-    return int(value) if value is not None else None
+    return {
+        "micro_batch_size": payload.get("micro_batch_size"),
+        "lr_scale": payload.get("lr_scale"),
+        "oom_reductions": payload.get("oom_reductions"),
+        "non_finite_restarts": payload.get("non_finite_restarts"),
+    }
 
 
 def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
@@ -111,21 +124,27 @@ def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
                     }
                 )
 
-        microbatch: dict[str, Any] = {}
+        runtime_checks: dict[str, Any] = {}
         for operator in EXPERIMENT_OPERATORS:
-            left_value = _runtime_microbatch(pilot_root, left, operator)
-            right_value = _runtime_microbatch(pilot_root, right, operator)
-            microbatch[operator] = {"left": left_value, "right": right_value, "equal": left_value == right_value}
-            if left_value is not None and right_value is not None and left_value != right_value:
+            left_state = _runtime_state(pilot_root, left, operator)
+            right_state = _runtime_state(pilot_root, right, operator)
+            equal = left_state == right_state
+            runtime_checks[operator] = {
+                "left": left_state,
+                "right": right_state,
+                "equal": equal,
+            }
+            if left_state and right_state and not equal:
                 warnings.append(
                     {
-                        "kind": "paired_specialist_microbatch_mismatch",
+                        "kind": "paired_specialist_runtime_mismatch",
                         "pair": [left, right],
                         "operator": operator,
-                        "left": left_value,
-                        "right": right_value,
+                        "left": left_state,
+                        "right": right_state,
                         "interpretation": (
-                            "effective batch is still matched, but gradient accumulation and floating-point order differ"
+                            "effective batch is matched, but micro-batch, accumulation order, OOM recovery, "
+                            "or learning-rate recovery differed between the paired specialist runs"
                         ),
                     }
                 )
@@ -135,7 +154,7 @@ def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
                 "left": left,
                 "right": right,
                 "shared_endpoint_checks": shared,
-                "specialist_microbatch_checks": microbatch,
+                "specialist_runtime_checks": runtime_checks,
             }
         )
 
