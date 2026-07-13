@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable
 
 from opfusion import fusion_eval as core
 from opfusion.training.config import load_run_config
-from opfusion.training.data import SyntheticTraceFactory
 
 
-DEFAULT_FINAL_EVALUATION_SEED = 700_000
+DEFAULT_FINAL_EVALUATION_SEED = core.DEFAULT_EVALUATION_SEED
 DEFAULT_PILOT_EVALUATION_SEED = 701_000
-_ORIGINAL_TRAINING_EXAMPLE = SyntheticTraceFactory.training_example
 
 
 def _default_evaluation_seed(config_path: Path) -> int:
@@ -23,25 +20,6 @@ def _default_evaluation_seed(config_path: Path) -> int:
         if config.experiment_id.startswith("model_design_pilot_")
         else DEFAULT_FINAL_EVALUATION_SEED
     )
-
-
-@contextmanager
-def _evaluation_seed_override(evaluation_seed: int) -> Iterator[None]:
-    if evaluation_seed < 0:
-        raise ValueError("evaluation_seed must be nonnegative")
-
-    def patched(self: SyntheticTraceFactory, job_id: str, *args: Any, **kwargs: Any):
-        # The core evaluator uses a private fixed seed. Override only that
-        # evaluation namespace and leave all other factory calls untouched.
-        if int(kwargs.get("seed", -1)) == DEFAULT_FINAL_EVALUATION_SEED:
-            kwargs["seed"] = evaluation_seed
-        return _ORIGINAL_TRAINING_EXAMPLE(self, job_id, *args, **kwargs)
-
-    SyntheticTraceFactory.training_example = patched  # type: ignore[method-assign]
-    try:
-        yield
-    finally:
-        SyntheticTraceFactory.training_example = _ORIGINAL_TRAINING_EXAMPLE  # type: ignore[method-assign]
 
 
 def evaluate_manifest_seeded(
@@ -57,17 +35,18 @@ def evaluate_manifest_seeded(
 ) -> dict[str, Any]:
     config_path = Path(config_path).resolve()
     resolved_seed = _default_evaluation_seed(config_path) if evaluation_seed is None else evaluation_seed
-    with _evaluation_seed_override(resolved_seed):
-        report = core.evaluate_manifest(
-            config_path=config_path,
-            manifest_path=manifest_path,
-            split=split,
-            examples_per_operator=examples_per_operator,
-            max_new_tokens=max_new_tokens,
-            alpha=alpha,
-            device_name=device_name,
-        )
-    report["evaluation_seed"] = resolved_seed
+    if resolved_seed < 0:
+        raise ValueError("evaluation_seed must be nonnegative")
+    report = core.evaluate_manifest(
+        config_path=config_path,
+        manifest_path=manifest_path,
+        split=split,
+        examples_per_operator=examples_per_operator,
+        max_new_tokens=max_new_tokens,
+        alpha=alpha,
+        device_name=device_name,
+        evaluation_seed=resolved_seed,
+    )
     report["evaluation_role"] = (
         "model_design_development"
         if resolved_seed == DEFAULT_PILOT_EVALUATION_SEED
