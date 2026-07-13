@@ -18,16 +18,21 @@ def _surface():
 def test_zero_negation_is_a_valid_single_transition() -> None:
     tokenizer, factory = _surface()
     example = None
-    for index in range(10_000):
-        candidate = factory.training_example(
-            "scalar.neg",
-            seed=401,
-            split="validation",
-            step=index,
-            sample_index=index,
-        )
-        if candidate.prompt_state_values == (0,):
-            example = candidate
+    # NEG(0) belongs to exactly one hash-partitioned IID split. Search all
+    # partitions rather than assuming that its fixed bucket is validation.
+    for split in ("train", "validation", "test"):
+        for index in range(10_000):
+            candidate = factory.training_example(
+                "scalar.neg",
+                seed=401,
+                split=split,
+                step=index,
+                sample_index=index,
+            )
+            if candidate.prompt_state_values == (0,) and candidate.task != "terminal_stop":
+                example = candidate
+                break
+        if example is not None:
             break
     assert example is not None
     expected = tokenizer.encode_tokens(example.response_tokens, add_bos=False, add_eos=True)
