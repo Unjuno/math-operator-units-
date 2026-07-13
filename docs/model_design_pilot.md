@@ -36,7 +36,7 @@ math SDPA: enabled
 
 The identity pair independently recomputes the same identity Base and Joint; the weak pair independently recomputes the same weak Base and Joint. At the end, `opfusion-audit-pilot-pairs` hashes the selected model state of `base.common` and `joint.all_five.exposure_matched` and requires exact equality within each pair. A mismatch is a scientific failure, exit status 67, and the watchdog does not retry it blindly.
 
-The pair audit also records specialist micro-batch choices. Unequal micro-batches do not change the declared effective batch, but they do change gradient-accumulation and floating-point order, so they are reported as interpretation warnings.
+The pair audit also records specialist runtime choices and recovery state. Unequal micro-batches do not change the declared effective batch, but they do change gradient-accumulation and floating-point order. OOM reductions, non-finite restarts, or learning-rate recovery differences are also reported as interpretation warnings.
 
 ## Base definitions
 
@@ -94,7 +94,7 @@ Selection rules:
 
 The IID test bucket is never used for checkpoint or model-design selection.
 
-## Evaluation splits
+## Evaluation splits and sample namespaces
 
 The pilot evaluates:
 
@@ -106,6 +106,15 @@ length_ood
 
 It intentionally does **not** evaluate the IID `test` bucket. That bucket remains reserved for the production experiment after the model-construction rule is fixed.
 
+The canonical evaluation CLI records the synthetic-data seed in every report. Model-design configs automatically use:
+
+```text
+pilot development seed: 701000
+final/default seed:     700000
+```
+
+This keeps the pilot validation/OOD examples disjoint from the later final evaluation examples, even when the split name is the same. Pilot OOD reports are development stress diagnostics and must not be quoted as final OOD evidence. Final reporting must use the default final seed or another preregistered seed that was not inspected during model selection.
+
 For each pilot split, two reports are written:
 
 ```text
@@ -113,7 +122,7 @@ For each pilot split, two reports are written:
 <condition>_<split>_units.json
 ```
 
-The first compares Base, Relevant Specialist, raw sum, bias mean, and matched Joint. The second measures every specialist relative to the Base on every target operator using teacher-forced response positions:
+The first compares Base, Relevant Specialist, raw sum, bias mean, and matched Joint. The second measures every specialist relative to the Base on the exact same seeded examples using teacher-forced response positions:
 
 - Base-to-unit Jensen–Shannon divergence;
 - Base-to-unit KL;
@@ -131,10 +140,10 @@ Every output root receives `experiment_contract.json`. The fingerprint includes:
 - model-design controls;
 - model and tokenizer configuration hashes;
 - vocabulary hash;
-- relevant training, hardened retention, diagnostics, and evaluation source hashes;
+- relevant training, hardened retention, seeded evaluation, diagnostics, and evaluation source hashes;
 - Git commit when available.
 
-A mismatched output directory is rejected before checkpoint reuse. Changing learning rate, base mode, retention weights, data ranges, trainer code, tokenizer, or diagnostics requires a new output directory.
+A mismatched output directory is rejected before checkpoint reuse. Changing learning rate, base mode, retention weights, data ranges, trainer code, tokenizer, evaluation namespace, or diagnostics requires a new output directory.
 
 ## Execution
 
@@ -167,19 +176,20 @@ A machine reboot stops the process. Run the same detached command again with the
 
 ## Decision rule
 
-Choose the production construction from validation and declared OOD diagnostics only. Compare, in this order:
+Select the production construction primarily from validation. Use the pilot OOD reports only as preregistered development stress checks and retain their separate evaluation seed in the record. Compare, in this order:
 
 1. relevant-specialist validation accuracy;
-2. raw-sum and bias-mean trace validity;
-3. EOS stopping accuracy;
-4. total all-five interference relative to the Relevant Specialist;
+2. raw-sum and bias-mean validation trace validity;
+3. validation EOS stopping accuracy;
+4. total all-five validation interference relative to the Relevant Specialist;
 5. per-unit inactive JSD, KL, argmax agreement, and centered-bias magnitude;
 6. Jensen–Shannon divergence and argmax agreement to the matched all-five Joint;
 7. selected checkpoint step versus final step;
 8. parameter displacement and retention logs;
-9. pair-consistency result and micro-batch warnings.
+9. pair-consistency result and specialist runtime warnings;
+10. development OOD stress results, without treating them as final evidence.
 
-The weak-base/retention candidate should advance only if it preserves relevant-specialist capability while reducing inactive drift or improving fusion stability. If retention suppresses specialist capability, tune its global coefficient on validation data in a separate pilot. Do not inspect the reserved IID test bucket while making that choice.
+The weak-base/retention candidate should advance only if it preserves relevant-specialist capability while reducing inactive drift or improving fusion stability. If retention suppresses specialist capability, tune its global coefficient on validation data in a separate pilot. Do not inspect the reserved IID test bucket or final-seed OOD examples while making that choice.
 
 ## Production gate
 
@@ -192,4 +202,4 @@ OPFUSION_ALLOW_V4_PRODUCTION=1 \
     detach
 ```
 
-The environment variable is an operational safeguard, not evidence that the candidate passed the pilot. Preserve all pilot reports and the pair-consistency audit with the final experiment record.
+The environment variable is an operational safeguard, not evidence that the candidate passed the pilot. Preserve all pilot reports, their evaluation seeds, and the pair-consistency audit with the final experiment record.
