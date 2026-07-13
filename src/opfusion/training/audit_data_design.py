@@ -85,8 +85,8 @@ def audit_design_data(config_path: str | Path, *, samples_per_operator: int = 51
                 if first.task != "identity_equivalence" or first.final_value is not None:
                     fail("identity_base_contract_violation", operator=operator_id, task=first.task)
             else:
-                if not first.task.startswith("weak_multitask:"):
-                    fail("weak_base_wrong_task", operator=operator_id, task=first.task)
+                if first.job_id != "base.common" or first.task not in {"full_trace", "continuation", "terminal_stop"}:
+                    fail("weak_base_task_semantics_invalid", operator=operator_id, task=first.task)
                 if len(first.initial_values) > design.base_weak_max_terms:
                     fail("weak_base_too_long", operator=operator_id, values=first.initial_values)
                 if any(abs(value) > design.base_weak_operand_abs_max for value in first.initial_values):
