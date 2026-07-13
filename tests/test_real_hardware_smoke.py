@@ -64,6 +64,6 @@ def test_cuda_smoke_is_standalone_verified_and_used_by_production() -> None:
     assert 'SKIP_STATIC_PREFLIGHT=1 bash "$CUDA_SMOKE" "$SMOKE_CONFIG"' in production_launcher
     assert "run_surface_v4_cuda_smoke.sh" in bootstrap
     assert "TORCH_INDEX_URL" in bootstrap
-    assert "--upgrade torch --index-url" in bootstrap
+    assert "--upgrade --force-reinstall torch --index-url" in bootstrap
     assert "scripts/run_surface_v4_cuda_smoke.sh" in workflow
     assert "Validate CUDA smoke plan" in workflow
