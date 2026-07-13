@@ -4,17 +4,18 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 import torch
 
 from .data import EXPERIMENT_OPERATORS
 
 
-PAIRS = (
-    ("identity_unanchored", "identity_retention"),
-    ("weak_unanchored", "weak_retention"),
-)
+PAIR_MAP = {
+    "identity": ("identity_unanchored", "identity_retention"),
+    "weak": ("weak_unanchored", "weak_retention"),
+}
+PAIRS = tuple(PAIR_MAP.values())
 SHARED_JOBS = ("base.common", "joint.all_five.exposure_matched")
 
 
@@ -78,14 +79,18 @@ def _runtime_state(root: Path, condition: str, job_id: str) -> dict[str, Any]:
     }
 
 
-def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
+def audit_pilot_pairs(
+    repo_root: str | Path = ".",
+    *,
+    pairs: Sequence[tuple[str, str]] = PAIRS,
+) -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
     pilot_root = repo_root / "runs/model_design_pilot"
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     pair_results: list[dict[str, Any]] = []
 
-    for left, right in PAIRS:
+    for left, right in pairs:
         shared: dict[str, Any] = {}
         for job_id in SHARED_JOBS:
             try:
@@ -144,7 +149,7 @@ def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
                         "right": right_state,
                         "interpretation": (
                             "effective batch is matched, but micro-batch, accumulation order, OOM recovery, "
-                            "or learning-rate recovery differed between the paired specialist runs"
+                            "or learning-rate recovery differed between the paired Specialist runs"
                         ),
                     }
                 )
@@ -169,12 +174,15 @@ def audit_pilot_pairs(repo_root: str | Path = ".") -> dict[str, Any]:
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Verify that retention/unanchored pilot pairs share exact base and joint endpoints"
+        description="Verify that retention/unanchored pilot pairs share exact Base and Joint endpoints"
     )
     parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--pair", choices=("all", *PAIR_MAP), default="all")
     parser.add_argument("--out", default="audits/model_design_pilot/pair_consistency.json")
     args = parser.parse_args(list(argv) if argv is not None else None)
-    report = audit_pilot_pairs(args.repo_root)
+    pairs = PAIRS if args.pair == "all" else (PAIR_MAP[args.pair],)
+    report = audit_pilot_pairs(args.repo_root, pairs=pairs)
+    report["pair_scope"] = args.pair
     text = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.out:
         path = Path(args.out)
