@@ -1,0 +1,60 @@
+plan:
+  id: bias_fusion_surface_v4_v1
+  status: prospective_before_target_gpu_pilot
+  smoke:
+    config: configs/experiments/gpt_bias_fusion_factory_surface_v4_smoke.yaml
+    required_marker: runs/gpt_bias_fusion_factory_surface_v4_smoke/cuda_smoke_complete.json
+    scientific_evidence: false
+  pilot:
+    configs:
+      - configs/experiments/model_design_pilot_identity_unanchored.yaml
+      - configs/experiments/model_design_pilot_identity_retention.yaml
+      - configs/experiments/model_design_pilot_weak_unanchored.yaml
+      - configs/experiments/model_design_pilot_weak_retention.yaml
+    seeds: [0]
+    splits: [validation]
+    primary_metric: trace_validity
+    primary_quantity: raw_sum_minus_relevant_specialist
+    eligibility:
+      pair_audit_must_pass: true
+      minimum_mean_relevant_trace_validity: 0.80
+      maximum_guardrail_deficit_from_best: 0.02
+    clear_winner_gap: 0.02
+    near_tie_tolerance: 0.01
+    near_tie_inactive_drift_reduction: 0.20
+    retention_minimum_drift_reduction: 0.10
+    retention_maximum_relevant_regression: 0.02
+    ambiguous_action: repeat_all_four_conditions_on_one_additional_seed
+    no_eligible_action: stop_and_version_new_plan
+  production:
+    config: configs/experiments/gpt_bias_fusion_factory_surface_v4.yaml
+    seeds: [0, 1, 2]
+    models_per_seed: 7
+    endpoint_policy: validation_selected
+  final:
+    evaluation_seed: 700000
+    splits: [iid_test, operand_ood, length_ood]
+    examples_per_operator: 64
+    primary_subset: 31
+    primary_condition: raw_sum
+    primary_alpha: 1.0
+    comparator: relevant_specialist
+    primary_metric: trace_validity
+    preserved_mean_gap: -0.02
+    preserved_worst_operator_gap: -0.05
+    material_failure_mean_gap: -0.10
+    material_failure_eos_gap: -0.05
+    secondary_condition: bias_mean
+    optional_alpha_grid: [0.25, 0.50, 0.75, 1.00]
+    one_alpha_for_all_seeds_operators_splits: true
+  reporting:
+    replication_unit: training_seed
+    formal_p_values: false
+    report_every_seed: true
+    report_every_operator: true
+    aggregate_seed_weighting: equal
+    missing_seed_policy: no_imputation
+  reserved_until_frozen:
+    - iid_test
+    - operand_ood
+    - length_ood
