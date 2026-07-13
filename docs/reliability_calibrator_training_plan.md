@@ -1,372 +1,214 @@
-# Reliability Calibrator Training Plan
+# Optional Reliability-Calibrator Training Plan
 
-This document defines how to train the paired reliability calibrator `R_k` for a fixed generator `M_k`.
+> **Status:** deferred ablation. Do not train a calibrator until the GPT specialists, common base, joint reference, raw fusion baseline, and error-amplification measurements are complete.
 
-## 1. Core principle
+## 1. Purpose
 
-The generator should not self-certify its own output.
+This document describes one possible follow-up method when raw bias fusion shows structured inactive leakage or wrong-token amplification.
 
-Training order:
+It does not define the core model factory. It does not imply that every specialist requires a paired corrector. It must be compared against simpler alternatives such as fixed coefficients, averaging, centering, and norm balancing.
+
+## 2. Preconditions
+
+A calibrator experiment is valid only after the following artifacts exist:
+
+1. a trained common `BaseGPT`;
+2. frozen specialist checkpoints branched from that base;
+3. a frozen joint reference checkpoint;
+4. executable raw fusion over the same prefix and vocabulary;
+5. exact task and trace verifiers;
+6. measured inactive leakage and amplification events;
+7. aligned IID and OOD evaluation splits.
+
+The calibrator must not be used to hide defects in the base model, specialist training, prompt masking, tokenizer ABI, or exposure matching.
+
+## 3. Candidate formulation
+
+For specialist `M_k`, compute:
 
 ```text
-1. Train or instantiate generator M_k.
-2. Freeze M_k.
-3. Run M_k on owned, non-owned, and OOD inputs.
-4. Record its generated bias fields and sequence paths.
-5. Train R_k to judge whether M_k's generated path is reliable.
-6. Use R_k to attenuate or remove unreliable parts before composition.
+B_k(v | x) = z_k(v | x) - z_base(v | x)
 ```
 
-`R_k` is not a global applicability oracle. It is a model-specific auditor for `M_k`.
+A reliability model may predict:
 
-## 2. Inputs to R_k
-
-The calibrator should not receive only the raw expression or only the final token.
-
-Recommended input bundle:
+### Scalar weight
 
 ```text
-x:
-  current prefix / current expression / trace state
-
-B_k:
-  bias field emitted by M_k
-
-summary(B_k):
-  top tokens
-  pmax
-  entropy
-  logit margin
-  norm
-  centered norm
-  rank profile
-
-optional signals:
-  verifier score
-  progress score
-  equality-validity score
-  consensus or conflict with other fields
-  length/depth/OOD indicators
-```
-
-The key is that `R_k` audits the path that `M_k` is actually trying to generate.
-
-## 3. Outputs from R_k
-
-There are three useful levels.
-
-### 3.1 Scalar reliability
-
-```text
-R_k(x, B_k) -> r_k in [0, 1]
+R_k(x, summary(B_k)) -> r_k in [0, 1]
 B_tilde_k = r_k B_k
 ```
 
-This is the simplest form.
-
-### 3.2 Token-wise reliability
+### Token-wise weight
 
 ```text
 R_k(x, B_k) -> r_k(v | x) in [0, 1]
 B_tilde_k(v | x) = r_k(v | x) B_k(v | x)
 ```
 
-This can suppress only specific token directions.
-
-### 3.3 Removal-field prediction
+### Removal field
 
 ```text
 R_k(x, B_k) -> E_k(v | x)
-B_tilde_k(v | x) = B_k(v | x) - E_k(v | x)
-```
-
-This is the most expressive form. It allows the calibrator to remove an estimated error component rather than simply shrinking the whole field.
-
-## 4. Data construction
-
-For each generator `M_k`, create a calibrator dataset by running the frozen generator over several input families.
-
-### 4.1 Owned positives
-
-```text
-inputs from M_k's own operator family
-valid generated paths
-fields matching the reference softmax effect
-fields accepted by verifier/progress checks
-```
-
-Targets:
-
-```text
-reliability high
-attenuation low
-removal field near zero
-```
-
-### 4.2 Non-owned negatives
-
-```text
-inputs from other operator families
-fields produced by M_k on non-owned contexts
-wrong operator assimilation cases
-```
-
-Targets:
-
-```text
-reliability low
-attenuation high
-remove harmful components
-```
-
-### 4.3 OOD negatives
-
-```text
-length outside training range
-depth outside training range
-malformed expressions
-ambiguous expressions
-rare token combinations
-mixed operators not seen by M_k
-```
-
-Targets depend on behavior:
-
-```text
-if M_k abstains or stays low-confidence:
-  mild penalty
-
-if M_k emits peaked wrong bias:
-  strong attenuation / removal target
-```
-
-### 4.4 Hard negatives
-
-Hard negatives are essential.
-
-```text
-cases where M_k is confident but wrong
-cases where wrong output has high pmax
-cases where wrong field has low entropy
-cases where wrong field resembles a valid owned path
-cases where another unit would be correct but M_k still emits a strong field
-```
-
-These are the examples that make `R_k` useful.
-
-## 5. Label generation
-
-Labels can be produced using exact evaluators and reference fields.
-
-For a generated field `B_k`, compute:
-
-```text
-p_k = softmax(z_0 + B_k)
-p_ref = softmax(z_0 + B_ref)
-```
-
-Possible labels:
-
-```text
-softmax_effect_distance = JSD(p_ref, p_k)
-verifier_delta = V(p_k) - V(p_0)
-reference_alignment = cos(Center(B_k), Center(B_ref))
-wrong_top_token = top(p_k) not in accepted set
-owned_path = 1 or 0
-reliability = calibrated target in [0, 1]
-```
-
-A simple reliability target:
-
-```text
-r_star = exp(-alpha * JSD(p_ref, p_k)) * verifier_accept
-```
-
-For removal-field training:
-
-```text
-E_star = B_k - B_ref_projected
-```
-
-where `B_ref_projected` is a reference or allowed component in the same bias-field space.
-
-## 6. Losses
-
-A practical first loss:
-
-```text
-L = L_reliability + beta L_effect + gamma L_calibration
-```
-
-Where:
-
-```text
-L_reliability:
-  BCE or MSE between r_k and r_star
-
-L_effect:
-  KL/JSD between softmax(z_0 + B_tilde_k) and softmax(z_0 + B_ref)
-
-L_calibration:
-  calibration loss for predicted reliability vs observed correctness
-```
-
-For token-wise or removal-field versions:
-
-```text
-L_remove = ||(B_k - E_k) - B_ref_projected||^2
-```
-
-or effect-space form:
-
-```text
-L_remove_effect = JSD(softmax(z_0 + B_k - E_k), softmax(z_0 + B_ref))
-```
-
-## 7. Phased implementation
-
-### Phase 0: scalar reliability classifier
-
-Train:
-
-```text
-R_k(x, summary(B_k)) -> r_k
-```
-
-Use:
-
-```text
-B_tilde_k = r_k B_k
-```
-
-This tests whether the calibrator can detect high-level failure paths.
-
-### Phase 1: token-wise reliability mask
-
-Train:
-
-```text
-R_k(x, B_k) -> r_k(v | x)
-```
-
-Use:
-
-```text
-B_tilde_k(v | x) = r_k(v | x) B_k(v | x)
-```
-
-This tests whether the calibrator can suppress only harmful token directions.
-
-### Phase 2: removal-field predictor
-
-Train:
-
-```text
-R_k(x, B_k) -> E_k(v | x)
-```
-
-Use:
-
-```text
 B_tilde_k = B_k - E_k
 ```
 
-This tests whether the calibrator can learn a structured correction field.
+These variants have different capacity and must not be grouped as one method.
 
-### Phase 3: shared trunk + per-generator head
-
-Use:
+## 4. Training order
 
 ```text
-R_shared(x, B_k) -> h
-R_k_head(h) -> reliability / attenuation / removal
+1. Train and freeze BaseGPT.
+2. Train and freeze specialist M_k.
+3. Run M_k on owned, non-owned, mixed, and OOD prefixes.
+4. Save the actual emitted bias fields and outcomes.
+5. Label reliability using exact task and trace verifiers.
+6. Train R_k without updating M_k.
+7. Evaluate raw and calibrated fusion on the same held-out prefixes.
 ```
 
-This shares generic reliability features while preserving generator-specific failure profiles.
+The generator must not self-certify its own output.
 
-## 8. Evaluation metrics
+## 5. Inputs
+
+Candidate inputs include:
 
 ```text
-path_reliability_auc
-owned_vs_non_owned_auc
-hard_negative_recall
+prefix x
+bias field B_k
+centered field norm
+top-token identities and margins
+entropy and top probability
+agreement or conflict with other fields
+exact verifier result
+trace-progress result
+value and length OOD indicators
+```
+
+A critical ablation removes explicit operator identity. This determines whether the model detects reliability from the generated field or merely routes by an operator token.
+
+## 6. Data families
+
+### Owned cases
+
+- in-domain operator prompts;
+- valid generated traces;
+- correct final answers;
+- stable fields across equivalent states.
+
+### Non-owned cases
+
+- prompts from other operator families;
+- mixed-operator prompts;
+- irrelevant specialists evaluated on valid foreign tasks.
+
+### OOD cases
+
+- values outside the training range;
+- longer traces;
+- malformed expressions;
+- rare token combinations;
+- premature or repeated stop/equality tokens.
+
+### Hard negatives
+
+- confident wrong outputs;
+- low-entropy wrong fields;
+- operator-assimilation events;
+- fields that strongly amplify an incorrect token when fused.
+
+## 7. Targets
+
+Possible targets are:
+
+```text
+exact correctness
+complete-trace validity
+verifier acceptance
+wrong-token amplification
+joint-reference divergence
+oracle usefulness of including the field
+```
+
+A scalar target may be derived from held-out measured utility, but the formula and threshold must be fixed before evaluating the calibrator.
+
+The label must not be based solely on whether the operator token matches the specialist name.
+
+## 8. Losses
+
+Candidate losses include:
+
+```text
+L_reliability:
+  BCE or regression against measured reliability
+
+L_effect:
+  KL or JSD between the calibrated fused distribution and the selected reference
+
+L_preserve:
+  penalty for suppressing a correct specialist contribution
+
+L_amplify:
+  penalty for retaining a field that increases wrong-token probability
+```
+
+A high-capacity removal-field model must be evaluated for answer leakage. It may learn the target distribution directly instead of calibrating the specialist.
+
+## 9. Required baselines
+
+Every result must compare:
+
+1. base only;
+2. each specialist alone;
+3. raw sum;
+4. arithmetic mean;
+5. fixed coefficient sweep;
+6. centered-field fusion;
+7. norm-balanced fusion;
+8. oracle applicability;
+9. learned scalar reliability;
+10. token-wise or removal-field variants only if justified.
+
+A calibrator is useful only when it improves over simple non-learned baselines and preserves valid competing contributions.
+
+## 10. Metrics
+
+```text
+raw_vs_calibrated_task_loss
+raw_vs_calibrated_exact_accuracy
+raw_vs_calibrated_trace_accuracy
+joint_vs_fused_kl_or_jsd
+wrong_token_amplification_reduction
+correct_contribution_preservation
 false_attenuation_rate
-attenuation_precision
-attenuation_recall
-post_calibration_softmax_jsd
-raw_vs_calibrated_delta
-wrong_top_token_suppression_rate
-correct_top_token_preservation_rate
-inactive_pmax_reduction
-confidence_calibration_error
+inactive_leakage_reduction
+reliability_calibration_error
+operator_identity_ablation_delta
 ```
 
-The key comparison is:
+Report results by operator, subset, seed, checkpoint, and OOD split.
+
+## 11. Stop conditions
+
+Do not continue to more expressive calibrators when:
+
+- raw fusion already works adequately;
+- fixed scaling solves the measured problem;
+- the calibrator only reproduces operator-token routing;
+- task accuracy improves while joint matching or trace validity degrades;
+- the calibrator predicts the answer independently of specialist fields;
+- improvements disappear under OOD evaluation.
+
+## 12. Short framing
 
 ```text
-raw composition:
-  F_raw = O(B_1, ..., B_n)
-
-calibrated composition:
-  F_cal = O(B_tilde_1, ..., B_tilde_n)
-```
-
-Success means:
-
-```text
-calibrated composition reduces unreliable dominance
-while preserving useful high-confidence paths
-```
-
-## 9. Minimal experiment
-
-Use two generators:
-
-```text
-M_ADD
-M_SUB
-```
-
-Train:
-
-```text
-R_ADD
-R_SUB
-```
-
-Construct four regimes:
-
-```text
-ADD-owned inputs
-SUB-owned inputs
-mixed ADD/SUB inputs
-OOD or malformed inputs
-```
-
-Compare:
-
-```text
-base only
-raw M_ADD + M_SUB composition
-scalar-calibrated composition
-token-wise-calibrated composition
-removal-field-calibrated composition
-```
-
-Primary question:
-
-```text
-Can R_ADD and R_SUB reduce confident wrong paths without erasing valid competing paths?
-```
-
-## 10. Short framing
-
-```text
-A reliability calibrator is trained after its generator is fixed. It learns the generator's failure profile by observing the fields and sequence paths that the generator actually emits on owned, non-owned, and OOD inputs. Its role is to attenuate or remove unreliable components before all calibrated fields are composed.
+Reliability calibration is an optional response to measured error amplification. It is trained only after the base, specialists, joint reference, and raw fusion baseline are fixed. Its purpose is to test whether learned weighting improves the same fusion problem, not to redefine bias fusion or assume in advance that every specialist requires correction.
 ```
 
 Japanese:
 
 ```text
-信頼性校正器は、対応する生成モデルを固定した後に作る。生成モデルが owned / non-owned / OOD 入力で実際に出す bias field と系列経路を観測し、その失敗傾向を学習する。役割は、全ての校正済み field を合成する前に、信頼できない成分を減衰または除去することである。
+信頼性補正は、raw bias fusionで誤差増幅が実測された場合に検討する追加実験である。
+共通base、specialist、joint reference、raw baselineを固定した後に学習し、固定係数や中心化などの
+単純手法と比較する。補正器はbias fusionの定義ではなく、全specialistに必須とも仮定しない。
 ```

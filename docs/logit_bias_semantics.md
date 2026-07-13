@@ -1,291 +1,238 @@
-# Logit Bias Semantics
+# Logit Bias Fusion Semantics
 
-This repository is not primarily about building a neural calculator, a faster router, keyword-based mode switching, or a replacement for symbolic computation.
+## 1. Project scope
 
-The core goal is to define and test a semantics for model control in logit space, especially when multiple model or unit outputs are produced in parallel over the same sequence context.
+This repository studies **bias fusion for language models**.
 
-## 1. Central object
+The goal is to combine logit-space changes from multiple models or model variants into one next-token distribution. Mathematical operator models are used only as a controlled experimental system because their data, intermediate states, answers, and failure cases can be generated and verified exactly.
 
-Let a base language model produce logits:
+The project does not define bias fusion as routing, calibration, or correction. Those mechanisms may be tested later as alternative ways to reduce fusion error.
 
-```text
-z_0(v | x)
-```
+## 2. Central objects
 
-for token `v` in vocabulary `V` and context `x`.
-
-A parallel model or unit produces:
+Let a common base model produce logits over vocabulary `V` for prefix `x`:
 
 ```text
-z_i(v | x)
+z_base(v | x)
 ```
 
-A control direction can be represented as a bias field:
+Let specialist model `k` produce:
 
 ```text
-B_i(v | x) = z_i(v | x) - z_0(v | x)
+z_k(v | x)
 ```
 
-or as an already centered field:
+Define its bias field relative to the same base:
 
 ```text
-B_i(v | x) ∈ R^{|V|}
+B_k(v | x) = z_k(v | x) - z_base(v | x)
 ```
 
-The controlled distribution is:
+A fusion rule `F` combines one or more fields:
 
 ```text
-p_F(v | x) = softmax(z_0(v | x) + λ F(v | x))
+B_fused(v | x) = F(B_1, B_2, ..., B_n)(v | x)
 ```
 
-where:
+The fused logits and distribution are:
 
 ```text
-F(v | x) = O(B_1, B_2, ..., B_n)(v | x)
+z_fused(v | x) = z_base(v | x) + B_fused(v | x)
+p_fused(v | x) = softmax(z_fused(v | x))
 ```
 
-The semantic object is not a single token or a single answer. The semantic object is the induced distributional change caused by the computed control field.
-
-## 2. Meaning of a bias field
-
-A bias field has meaning through its effect.
-
-Distributional effect:
+The semantic effect of fusion is the induced change in the next-token distribution:
 
 ```text
-Δp_F = softmax(z_0 + F) - softmax(z_0)
+Delta p = p_fused - p_base
 ```
 
-Verifier effect:
+## 3. Raw fusion baseline
+
+The first baseline is direct additive fusion:
 
 ```text
-ΔV(F) = E_{y ~ p_F}[V(y)] - E_{y ~ p_0}[V(y)]
+B_raw = sum_k alpha_k B_k
+z_raw = z_base + B_raw
 ```
 
-where `V` is a verifier, reward model, constraint checker, evaluator, or task-specific scoring function.
+where `alpha_k` is fixed or searched explicitly.
 
-Therefore:
+Raw fusion must be measured before adding a router, gate, confidence estimator, or learned corrector. Otherwise it is impossible to determine whether composition works or whether a separate mechanism simply selected one model.
+
+Raw addition is a baseline, not a claim of safety or correctness.
+
+## 4. Joint reference model
+
+A joint reference model is trained on the union of the specialist training distributions.
+
+For the same prefix:
 
 ```text
-meaning = distribution shift + verifier-score shift
+p_joint(v | x) = softmax(z_joint(v | x))
 ```
 
-Natural-language labels such as `truthful`, `concise`, `safe`, or `mathematical` are only useful when grounded in measurable distributional and verifier effects.
-
-## 3. Bias operators
-
-A bias operator is a typed transformation over logit-space fields.
-
-Definition:
+A distribution-matching loss can be defined as:
 
 ```text
-A bias operator is a typed transformation over logit-space fields whose semantic effect is defined by its induced change in the output distribution and verifier scores.
+L_match = D(p_joint, p_fused)
 ```
 
-Japanese:
+Possible choices include KL divergence or Jensen-Shannon divergence.
 
 ```text
-bias operator とは、logit空間上の場に対する型付き変換であり、
-その意味は softmax後の出力分布と verifier score に与える変化によって定義される。
+L_match = 0
 ```
 
-## 4. Core algebra
+means only that the two distributions are identical under the selected divergence. It does not prove that either model is correct. Exact task accuracy, intermediate-step validity, and termination behavior must be evaluated separately.
 
-### 4.1 Composition
+## 5. Error amplification
+
+The main practical risk is that an irrelevant specialist does not produce a neutral field.
 
 ```text
-B_compose = B_1 + B_2
+irrelevant input
+    -> structured non-zero specialist output
+    -> structured bias field
+    -> incorrect contribution to fusion
 ```
 
-Interpretation:
+When several incorrect fields align on the same token, fusion can amplify the error:
 
 ```text
-apply both control directions
+B_1(v_wrong | x) > 0
+B_2(v_wrong | x) > 0
+...
+B_raw(v_wrong | x) becomes large
 ```
 
-### 4.2 Difference
+This is different from independent zero-mean noise. It must be measured directly.
+
+Relevant measurements include:
+
+- inactive bias norm;
+- inactive top probability;
+- incorrect-token amplification;
+- field agreement and conflict;
+- raw-fusion task accuracy;
+- divergence from the joint reference;
+- change across training checkpoints;
+- value and length OOD behavior.
+
+## 6. Why the common base matters
+
+If each specialist is compared directly with random initialization, its field contains both:
+
+- common language or trace-format learning;
+- operator-specific learning.
+
+Then adding several specialist fields may add the same common component repeatedly.
+
+To isolate specialist changes, the intended construction is:
 
 ```text
-B_diff = B_A - B_B
+random initialization
+        ↓
+trained common BaseGPT
+        ↓
+BaseGPT -> specialist 1
+BaseGPT -> specialist 2
+...
+BaseGPT -> joint reference
 ```
 
-Interpretation:
+The bias origin is then:
 
 ```text
-preserve the A direction while subtracting the B direction
+B_k = z_k - z_base
 ```
 
-### 4.3 Completion
+where `z_base` is produced by the trained common BaseGPT checkpoint, not by an untrained random model.
 
-Given a target field and current field:
+## 7. Fusion rules to test
+
+The minimal sequence of experiments is:
+
+### 7.1 Direct sum
 
 ```text
-B_missing = B_target - B_current
+B_fused = sum_k B_k
 ```
 
-Interpretation:
+### 7.2 Mean or fixed scaling
 
 ```text
-add the missing semantic component needed to move toward the target behavior
+B_fused = (1 / n) sum_k B_k
 ```
 
-### 4.4 Projection removal
+or:
 
 ```text
-Proj_C(B) = (<B, C> / (<C, C> + ε)) C
-B_remove_C = B - Proj_C(B)
+B_fused = sum_k alpha_k B_k
 ```
 
-Interpretation:
+with fixed reported coefficients.
+
+### 7.3 Centered or normalized variants
 
 ```text
-remove the component of B aligned with C
+Center(B) = B - mean_v(B(v))
 ```
 
-### 4.5 Agreement
+Normalization is an ablation because it changes field scale and may remove useful magnitude information.
 
-```text
-B_agree(v) = [B_1(v)]_+ [B_2(v)]_+
-```
+### 7.4 Oracle weighting
 
-Interpretation:
+Oracle applicability or task identity may be used only as an upper-bound control. It is not evidence that unguided bias fusion works.
 
-```text
-keep or emphasize tokens that both fields positively support
-```
+### 7.5 Learned routing or calibration
 
-### 4.6 Residual
+Learned weights, token-wise correction, or removal fields are later hypotheses. They must be compared against the same raw baseline and the same checkpoints.
 
-```text
-R = B_target - B_explained
-```
+## 8. Why mathematical operators are used
 
-Interpretation:
+Mathematical operator tasks are selected because they make the fusion experiment easier to verify:
 
-```text
-the part of a desired control effect not explained by known bias operators
-```
+1. training data can be generated deterministically;
+2. final answers can be checked exactly;
+3. intermediate equality steps can be verified;
+4. mixed and conflicting operator distributions can be constructed deliberately;
+5. specialist and joint training exposure can be counted exactly;
+6. inactive-model behavior can be measured without subjective labels;
+7. failure cases can be reproduced across checkpoints and seeds.
 
-Residuals are not automatically meaningful. They require stability, verifier support, and repeated evidence across samples.
+The operators are experimental instruments. The intended later application is more general language-model bias fusion.
 
-## 5. Contribution-controlled bias semantics
+## 9. What this project does not assume
 
-Raw learned modules are not assumed to be neutral outside their training domain.
+The repository does not assume that:
 
-The general contribution-controlled form is token-wise:
-
-```text
-F(v | x) = Σ_i c_i(v | x) B_i(v | x)
-```
-
-where:
-
-```text
-c_i(v | x) ∈ [0, 1]
-```
-
-A lower-rank scalar-gate approximation is:
-
-```text
-F(v | x) = Σ_i g_i(x) B_i(v | x)
-```
-
-Interpretation:
-
-```text
-corrector = contribution controller over a bias field
-```
-
-The corrector is not primarily a parser-based symbolic operator selector. It decides how much of a parallel bias field is allowed to affect the same-prefix next-token distribution.
-
-Without this control, direct summation can assign semantic force to irrelevant, out-of-domain, or assimilated bias outputs.
-
-## 6. Relation to runtime sets
-
-Runtime sets are an engineering mechanism, not the primary semantics.
-
-A runtime set chooses which fields are available:
-
-```text
-S_runtime ⊂ registry
-```
-
-Contribution controllers decide how those available fields affect the final distribution:
-
-```text
-z_final(v | x) = z_0(v | x) + Σ_{k in S_runtime} c_k(v | x) B_k(v | x)
-```
-
-Thus:
-
-```text
-runtime set:
-  chooses candidate parallel fields
-
-corrector:
-  controls contribution to the same-prefix distribution
-
-fusion:
-  composes the controlled fields
-```
-
-The goal is not keyword-based mode switching and not routing to one expert. The goal is to transform and compose multiple parallel control fields over the same sequence prefix.
-
-## 7. Why math is used as a proxy
-
-Mathematical operator experiments are controlled proxies for testing this semantics.
-
-They are useful because:
-
-```text
-1. exact bias fields can be generated by program
-2. typed operators can be defined explicitly
-3. exact and learned operator outputs can be compared
-4. wrong compositions can be constructed deliberately
-5. softmax distribution effects can be measured
-6. inactive leakage and OOD peakedness can be measured
-7. contribution-controlled fusion can be compared against direct summation
-```
-
-The point is not that addition is useful by itself. The point is to test whether learned operator modules preserve interpretable logit-space effects under composition.
-
-## 8. What this project is not
-
-```text
-not a replacement for symbolic computation
-not primarily a calculator
-not keyword-based mode switching
-not a claim that LLM fusion automatically works
-not a claim that raw bias addition is safe
-not a standard MoE router
-```
-
-## 9. What this project is
-
-```text
-a controlled study of same-prefix parallel logit-space bias control
-```
-
-More specifically:
-
-```text
-human-defined bias operators
-+ automatically generated supervision
-+ parallel model/unit outputs
-+ contribution controllers
-+ external operator graphs
-+ softmax/verifier effect measurement
-```
+- raw addition succeeds;
+- irrelevant models are neutral;
+- a corrector is always required;
+- a router is equivalent to fusion;
+- the joint model is necessarily optimal;
+- matching the joint distribution guarantees task correctness;
+- proxy-model results transfer to GPT models;
+- mathematical success automatically transfers to natural language.
 
 ## 10. Minimal research claim
 
+The current research claim is deliberately limited:
+
 ```text
-Learned bias modules should not be treated as safely composable by raw addition. They become meaningful compositional control units only when their logit-space effects are typed, measured, and controlled as contributions to the same-prefix next-token distribution.
+Bias fusion can be studied as a controlled comparison between a common base model,
+independently specialized models, and a jointly trained reference model.
+Mathematical operator tasks are used because they expose useful contributions,
+irrelevant leakage, interaction errors, and error amplification in a form that can
+be generated and verified exactly.
 ```
 
 Japanese:
 
 ```text
-学習済みbias moduleは、生の加算だけで安全に合成できるとは仮定しない。
-それらは、logit空間上の効果が型付けされ、測定され、同じ系列prefixの次token分布への寄与として制御されたときに初めて、意味を持つ合成可能な制御単位になる。
+本プロジェクトの目的は、複数の言語モデルまたはモデル変種が作るlogit biasを融合し、
+一つの次token分布を構成できるかを検証することである。数学演算子モデルは最終目的ではなく、
+正解・途中状態・失敗を厳密に生成・検証できる実験系として用いる。raw fusion、誤差増幅、
+joint modelとの分布差、必要に応じたroutingや補正を、同じcheckpoint上で分離して評価する。
 ```
