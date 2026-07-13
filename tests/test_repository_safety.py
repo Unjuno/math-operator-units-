@@ -23,7 +23,7 @@ def test_common_base_and_specialists_use_identical_model_facing_prefixes() -> No
     for index, operator_id in enumerate(EXPERIMENT_OPERATORS):
         kwargs = dict(
             seed=123,
-            split="train",
+            split="validation",
             step=index,
             sample_index=index,
             forced_operator=operator_id,
