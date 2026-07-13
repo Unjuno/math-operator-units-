@@ -49,10 +49,11 @@ def test_weak_multitask_base_is_restricted_and_deterministic() -> None:
     first = factory.training_example(**kwargs)
     second = factory.training_example(**kwargs)
     assert first == second
-    assert first.task.startswith("weak_multitask:")
+    assert first.job_id == "base.common"
+    assert first.task in {"full_trace", "continuation", "terminal_stop"}
     assert len(first.initial_values) <= design.base_weak_max_terms
     assert all(abs(value) <= design.base_weak_operand_abs_max for value in first.initial_values)
-    assert first.final_value is not None or first.task.endswith("terminal_stop")
+    assert first.final_value is not None or first.task == "terminal_stop"
 
 
 def test_experiment_contract_rejects_design_changes_in_existing_output(tmp_path: Path) -> None:
