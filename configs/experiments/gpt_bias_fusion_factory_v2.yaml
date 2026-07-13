@@ -33,6 +33,11 @@ experiment:
     value_ood_abs_max: 80
     length_ood_min_terms: 9
     length_ood_max_terms: 10
+    train_partition_end: 70
+    validation_partition_end: 85
+    full_trace_ratio: 0.60
+    continuation_ratio: 0.25
+    terminal_ratio: 0.15
 
   train:
     response_only_loss: true
