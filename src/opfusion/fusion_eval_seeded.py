@@ -34,6 +34,7 @@ def evaluate_manifest_seeded(
     evaluation_seed: int | None = None,
 ) -> dict[str, Any]:
     config_path = Path(config_path).resolve()
+    manifest_path = Path(manifest_path).resolve()
     resolved_seed = _default_evaluation_seed(config_path) if evaluation_seed is None else evaluation_seed
     if resolved_seed < 0:
         raise ValueError("evaluation_seed must be nonnegative")
@@ -47,6 +48,8 @@ def evaluate_manifest_seeded(
         device_name=device_name,
         evaluation_seed=resolved_seed,
     )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    report["experiment_fingerprint"] = manifest.get("experiment_fingerprint")
     report["evaluation_role"] = (
         "model_design_development"
         if resolved_seed == DEFAULT_PILOT_EVALUATION_SEED
