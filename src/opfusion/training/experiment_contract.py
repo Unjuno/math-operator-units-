@@ -39,18 +39,15 @@ def _file_hash(path: Path) -> str:
 
 
 def _git_revision(repo_root: Path) -> dict[str, Any]:
+    # Generated audits/evaluations must not change the fingerprint. Source-file
+    # hashes already catch local code edits, while the commit records provenance.
     try:
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=repo_root, text=True, stderr=subprocess.DEVNULL
         ).strip()
-        dirty = bool(
-            subprocess.check_output(
-                ["git", "status", "--porcelain"], cwd=repo_root, text=True, stderr=subprocess.DEVNULL
-            ).strip()
-        )
-        return {"commit": commit, "dirty": dirty}
+        return {"commit": commit}
     except (OSError, subprocess.SubprocessError):
-        return {"commit": None, "dirty": None}
+        return {"commit": None}
 
 
 def contract_payload(repo_root: Path, config: RunConfig) -> dict[str, Any]:
