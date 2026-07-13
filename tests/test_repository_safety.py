@@ -36,7 +36,8 @@ def test_weak_common_base_and_specialists_share_model_facing_prefix_schema() -> 
         assert base.prompt_tokens[0] == specialist.prompt_tokens[0]
         assert base.prompt_tokens[-1] == specialist.prompt_tokens[-1] == "<RESPONSE>"
         assert "<TASK_COPY>" not in base.prompt_tokens
-        assert base.task.startswith("weak_multitask:")
+        assert base.job_id == "base.common"
+        assert base.task in {"full_trace", "continuation", "terminal_stop"}
         assert len(base.initial_values) <= design.base_weak_max_terms
         assert all(abs(value) <= design.base_weak_operand_abs_max for value in base.initial_values)
         assert base.final_value is not None
