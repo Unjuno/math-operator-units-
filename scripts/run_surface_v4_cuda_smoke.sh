@@ -111,6 +111,7 @@ if not (
     and evaluation_payload.get("experiment_fingerprint") == fingerprint
     and evaluation_payload.get("evaluation_seed") == evaluation_seed
     and diagnostics_payload.get("experiment_fingerprint") == fingerprint
+    and diagnostics_payload.get("evaluation_seed") == evaluation_seed
 ):
     raise SystemExit(1)
 complete_files = sorted((output / "seed_0").glob("*/complete.json"))
@@ -177,6 +178,7 @@ fi
   --manifest "$MANIFEST" \
   --split validation \
   --examples-per-operator 8 \
+  --evaluation-seed "$SMOKE_EVALUATION_SEED" \
   --out "$DIAGNOSTICS_OUT"
 
 "$PYTHON" - "$MARKER" "$CONFIG" "$OUTPUT_DIR" "$MANIFEST" "$EVAL_OUT" "$DIAGNOSTICS_OUT" "$SMOKE_EVALUATION_SEED" <<'PY'
@@ -205,6 +207,8 @@ if diagnostics_payload.get("experiment_fingerprint") != fingerprint:
     raise SystemExit("smoke diagnostics fingerprint mismatch")
 if evaluation_payload.get("evaluation_seed") != evaluation_seed:
     raise SystemExit("smoke evaluation seed mismatch")
+if diagnostics_payload.get("evaluation_seed") != evaluation_seed:
+    raise SystemExit("smoke diagnostics seed mismatch")
 complete_files = sorted((output / "seed_0").glob("*/complete.json"))
 if len(complete_files) != 7:
     raise SystemExit(f"expected seven completed smoke models, found {len(complete_files)}")
