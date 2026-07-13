@@ -136,7 +136,7 @@ from pathlib import Path
 
 marker, manifest, config, output = map(Path, sys.argv[1:])
 condition = output.name
-splits = ("validation", "operand_ood", "length_ood")
+splits = ("validation",)
 reports = [
     Path("evaluations/model_design_pilot") / f"{condition}_{split}.json"
     for split in splits
@@ -219,7 +219,7 @@ config = Path(sys.argv[2])
 output = Path(sys.argv[3])
 contract = json.loads((output / "experiment_contract.json").read_text(encoding="utf-8"))
 commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-splits = ["validation", "operand_ood", "length_ood"]
+splits = ["validation"]
 payload = {
     "condition": condition,
     "status": "completed",
@@ -267,7 +267,7 @@ conditions=(
   weak_unanchored
   weak_retention
 )
-evaluation_splits=(validation operand_ood length_ood)
+evaluation_splits=(validation)
 
 for condition in "${conditions[@]}"; do
   config="configs/experiments/model_design_pilot_${condition}.yaml"
@@ -329,7 +329,7 @@ write_state running "" summarizing "building the cross-condition endpoint index"
 import json
 from pathlib import Path
 conditions = ["identity_unanchored", "identity_retention", "weak_unanchored", "weak_retention"]
-splits = ["validation", "operand_ood", "length_ood"]
+splits = ["validation"]
 records = []
 for condition in conditions:
     root = Path("runs/model_design_pilot") / condition / "seed_0"
@@ -360,7 +360,7 @@ path.write_text(
         {
             "conditions": records,
             "pair_consistency": "audits/model_design_pilot/pair_consistency.json",
-            "final_iid_test_reserved": True,
+            "reserved_final_splits": ["iid_test", "operand_ood", "length_ood"],
         },
         indent=2,
         sort_keys=True,
@@ -369,12 +369,12 @@ path.write_text(
 )
 print(path)
 PY
-write_state completed "" completed "all four conditions, diagnostics, and pair-consistency audit completed"
+write_state completed "" completed "all four validation diagnostics and pair-consistency audit completed"
 
 cat <<'EOF'
 Model-design pilot completed.
-Select the production design from validation and declared OOD diagnostics only.
-The IID test bucket is intentionally not evaluated by this pilot.
+Select the production design from validation only.
+IID test, operand OOD, and length OOD are intentionally reserved for final evaluation.
 Compare:
   1. relevant-specialist validation accuracy;
   2. raw-sum and bias-mean trace validity and EOS accuracy;
