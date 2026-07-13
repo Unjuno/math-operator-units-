@@ -38,11 +38,18 @@ from opfusion.training.design_config import load_design_run_config
 
 config_path = Path(sys.argv[1]).resolve()
 run = load_design_run_config(config_path)
+if not run.experiment_id.endswith("_smoke"):
+    raise SystemExit("smoke config experiment id must end with _smoke")
+if run.seeds != (0,) or not 0 < run.max_steps <= 3:
+    raise SystemExit("smoke config must use seed 0 and at most three optimizer steps")
 if not run.require_cuda:
     raise SystemExit("smoke config must require CUDA")
 if not run.deterministic_algorithms or run.allow_tf32:
     raise SystemExit("smoke config must use deterministic algorithms with TF32 disabled")
-print(run.output_dir)
+output = Path(run.output_dir)
+if output.is_absolute() or len(output.parts) < 2 or output.parts[0] != "runs":
+    raise SystemExit("smoke output_dir must be a relative path below runs/")
+print(output)
 print(f"audits/{run.experiment_id}_data.json")
 print(f"evaluations/{run.experiment_id}_validation.json")
 print(f"evaluations/{run.experiment_id}_validation_units.json")
@@ -59,14 +66,17 @@ smoke_complete() {
   "$PYTHON" - "$MARKER" "$CONFIG" "$OUTPUT_DIR" "$MANIFEST" "$EVAL_OUT" "$DIAGNOSTICS_OUT" "$SMOKE_EVALUATION_SEED" <<'PY'
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+import torch
+
 marker, config, output, manifest, evaluation, diagnostics = map(Path, sys.argv[1:7])
 evaluation_seed = int(sys.argv[7])
 required = (marker, config, output / "experiment_contract.json", manifest, evaluation, diagnostics)
-if any(not path.is_file() for path in required):
+if any(not path.is_file() for path in required) or not torch.cuda.is_available():
     raise SystemExit(1)
 try:
     marker_payload = json.loads(marker.read_text(encoding="utf-8"))
@@ -77,14 +87,26 @@ try:
 except Exception:
     raise SystemExit(1)
 commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+driver = subprocess.check_output(
+    ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], text=True
+).splitlines()[0].strip()
+props = torch.cuda.get_device_properties(0)
 config_sha = hashlib.sha256(config.read_bytes()).hexdigest()
 fingerprint = contract.get("fingerprint")
+gpu = marker_payload.get("gpu", {})
 if not (
     marker_payload.get("status") == "passed"
     and marker_payload.get("git_commit") == commit
     and marker_payload.get("config_sha256") == config_sha
     and marker_payload.get("experiment_fingerprint") == fingerprint
     and marker_payload.get("evaluation_seed") == evaluation_seed
+    and marker_payload.get("torch_version") == torch.__version__
+    and marker_payload.get("torch_cuda_runtime") == torch.version.cuda
+    and marker_payload.get("nvidia_driver_version") == driver
+    and marker_payload.get("cublas_workspace_config") == os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+    and gpu.get("name") == props.name
+    and gpu.get("capability") == f"{props.major}.{props.minor}"
+    and gpu.get("total_memory_bytes") == props.total_memory
     and manifest_payload.get("experiment_fingerprint") == fingerprint
     and evaluation_payload.get("experiment_fingerprint") == fingerprint
     and evaluation_payload.get("evaluation_seed") == evaluation_seed
@@ -110,7 +132,7 @@ PY
 }
 
 if [[ "${FORCE_SMOKE:-0}" != "1" ]] && smoke_complete; then
-  echo "CUDA smoke already passed for this commit and configuration: $MARKER"
+  echo "CUDA smoke already passed for this commit, configuration, GPU, driver, and PyTorch stack: $MARKER"
   exit 0
 fi
 
@@ -198,6 +220,9 @@ for complete_path in complete_files:
         if not path.is_file():
             raise SystemExit(f"checkpoint missing: {path}")
 props = torch.cuda.get_device_properties(0)
+driver = subprocess.check_output(
+    ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], text=True
+).splitlines()[0].strip()
 payload = {
     "status": "passed",
     "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
@@ -214,6 +239,7 @@ payload = {
         "capability": f"{props.major}.{props.minor}",
         "total_memory_bytes": props.total_memory,
     },
+    "nvidia_driver_version": driver,
     "torch_version": torch.__version__,
     "torch_cuda_runtime": torch.version.cuda,
     "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
