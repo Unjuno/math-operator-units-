@@ -108,6 +108,13 @@ def _delta_summary(initial: dict[str, torch.Tensor], current: dict[str, torch.Te
         current_tensor = current[name]
         if not torch.is_floating_point(initial_tensor):
             continue
+        if (
+            name == "lm_head.weight"
+            and "token_embedding.weight" in initial
+            and torch.equal(initial_tensor, initial["token_embedding.weight"])
+            and torch.equal(current_tensor, current["token_embedding.weight"])
+        ):
+            continue
         a = initial_tensor.double().reshape(-1)
         b = current_tensor.double().reshape(-1)
         d = b - a
