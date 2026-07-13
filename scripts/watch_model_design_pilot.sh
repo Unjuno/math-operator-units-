@@ -67,6 +67,7 @@ cleanup_pid() {
   fi
 }
 
+attempt=0
 child_pid=""
 on_signal() {
   local signal="$1"
@@ -83,7 +84,6 @@ trap 'on_signal INT' INT
 trap 'on_signal TERM' TERM
 trap cleanup_pid EXIT
 
-attempt=0
 while true; do
   attempt=$((attempt + 1))
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] model-design pilot attempt ${attempt}/${MAX_RESTARTS}"
