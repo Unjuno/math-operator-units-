@@ -8,11 +8,12 @@ MODE="${2:-foreground}"
 SMOKE_CONFIG="${SMOKE_CONFIG:-configs/experiments/gpt_bias_fusion_factory_surface_v3_smoke.yaml}"
 PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
 TRAIN_BATCH="${TRAIN_BATCH:-$ROOT/.venv/bin/opfusion-train-batch-surface}"
+REPO_AUDIT="${REPO_AUDIT:-$ROOT/.venv/bin/opfusion-audit}"
 AUDIT_DATA="${AUDIT_DATA:-$ROOT/.venv/bin/opfusion-audit-data}"
 MIN_FREE_GB="${MIN_FREE_GB:-15}"
 AUDIT_SAMPLES="${AUDIT_SAMPLES:-512}"
 
-if [[ ! -x "$PYTHON" || ! -x "$TRAIN_BATCH" || ! -x "$AUDIT_DATA" ]]; then
+if [[ ! -x "$PYTHON" || ! -x "$TRAIN_BATCH" || ! -x "$REPO_AUDIT" || ! -x "$AUDIT_DATA" ]]; then
   echo "virtual environment is missing or stale; run: bash scripts/bootstrap_arch_linux.sh" >&2
   exit 1
 fi
@@ -43,6 +44,7 @@ fi
 
 mkdir -p audits logs runs/gpt_bias_fusion_factory_surface_v3
 "$PYTHON" -m pytest -q
+"$REPO_AUDIT" . --data-samples-per-operator 64
 "$AUDIT_DATA" \
   --config "$CONFIG" \
   --samples-per-operator "$AUDIT_SAMPLES" \
