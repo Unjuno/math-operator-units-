@@ -54,8 +54,8 @@ class SyntheticDataConfig:
     def validate(self) -> None:
         if self.operand_min > self.operand_max:
             raise ValueError("operand_min must not exceed operand_max")
-        if self.min_terms < 2 or self.min_terms > self.max_terms:
-            raise ValueError("term range must satisfy 2 <= min_terms <= max_terms")
+        if self.min_terms < 1 or self.min_terms > self.max_terms:
+            raise ValueError("term range must satisfy 1 <= min_terms <= max_terms")
         if self.value_ood_abs_min <= max(abs(self.operand_min), abs(self.operand_max)):
             raise ValueError("operand OOD range must begin outside the train operand range")
         if self.value_ood_abs_min > self.value_ood_abs_max:
