@@ -5,18 +5,26 @@ import yaml
 from opfusion.training.design_config import load_design_run_config
 
 ROOT = Path(__file__).parents[1]
-PLAN = ROOT / "configs/experiments/experiment_plan_v1.yaml"
+PLAN_V1 = ROOT / "configs/experiments/experiment_plan_v1.yaml"
+PLAN_V2 = ROOT / "configs/experiments/experiment_plan_v2.yaml"
 
 
-def test_experiment_plan_matches_configs() -> None:
-    plan = yaml.safe_load(PLAN.read_text(encoding="utf-8"))["plan"]
+def load_plan(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))["plan"]
+
+
+def test_experiment_plan_v2_matches_configs() -> None:
+    v1 = load_plan(PLAN_V1)
+    plan = load_plan(PLAN_V2)
+    assert plan["id"] == "bias_fusion_surface_v4_v2"
+    assert plan["supersedes"] == v1["id"]
     assert plan["status"] == "prospective_before_target_gpu_pilot"
 
     smoke = load_design_run_config(ROOT / plan["smoke"]["config"])
     assert smoke.require_cuda and smoke.seeds == (0,)
     assert 0 < smoke.max_steps <= 3
 
-    pilots = [load_design_run_config(ROOT / p) for p in plan["pilot"]["configs"]]
+    pilots = [load_design_run_config(ROOT / path) for path in plan["pilot"]["configs"]]
     assert len(pilots) == 4
     assert all(run.seeds == (0,) for run in pilots)
     assert all(run.require_cuda for run in pilots)
@@ -31,17 +39,33 @@ def test_experiment_plan_matches_configs() -> None:
     final = plan["final"]
     assert final["evaluation_seed"] == 700000
     assert final["splits"] == ["iid_test", "operand_ood", "length_ood"]
-    assert final["examples_per_operator"] == 64
-    assert final["primary_subset"] == 31
     assert final["primary_condition"] == "raw_sum"
     assert final["primary_alpha"] == 1.0
+    assert final["selected_rescue_is_secondary"] is True
     assert plan["reserved_until_frozen"] == final["splits"]
 
 
-def test_plan_precommits_ambiguity_and_reporting_rules() -> None:
-    plan = yaml.safe_load(PLAN.read_text(encoding="utf-8"))["plan"]
-    assert plan["pilot"]["ambiguous_action"].startswith("repeat_all_four_conditions")
-    assert plan["pilot"]["no_eligible_action"] == "stop_and_version_new_plan"
-    assert plan["reporting"]["replication_unit"] == "training_seed"
-    assert plan["reporting"]["formal_p_values"] is False
-    assert plan["reporting"]["missing_seed_policy"] == "no_imputation"
+def test_plan_precommits_fallback_mixing_ladder() -> None:
+    plan = load_plan(PLAN_V2)
+    fallback = plan["contingency"]
+
+    assert fallback["activation"]["final_data_may_trigger_tuning"] is False
+    assert fallback["validation"] == {
+        "method": "leave_one_training_seed_out",
+        "folds": 3,
+        "tune_per_seed": False,
+        "tune_per_operator": False,
+    }
+    assert fallback["fixed_baselines"] == ["raw_sum", "bias_mean"]
+    assert fallback["stage_order"] == [
+        "global_shrinkage",
+        "norm_controlled",
+        "static_weighted_mean",
+        "consensus_tempered",
+    ]
+    assert fallback["global_shrinkage"]["alpha_grid"] == [0.10, 0.20, 0.25, 0.50, 0.75, 1.00]
+    assert fallback["selection"]["choose_first_eligible_family"] is True
+    assert fallback["selection"]["freeze_mixer_contract"] is True
+    assert fallback["learned_router_followup"]["part_of_confirmatory_final"] is False
+    assert fallback["learned_router_followup"]["requires_new_plan_and_output_roots"] is True
+    assert plan["reporting"]["preserve_raw_result_as_confirmatory"] is True
