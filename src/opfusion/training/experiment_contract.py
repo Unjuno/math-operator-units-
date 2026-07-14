@@ -31,6 +31,7 @@ _CODE_PATHS = (
     "src/opfusion/fusion_eval.py",
     "src/opfusion/fusion_eval_seeded.py",
     "src/opfusion/final_eval_guard.py",
+    "src/opfusion/final_eval_policy.py",
     "src/opfusion/fusion_diagnostics.py",
 )
 
