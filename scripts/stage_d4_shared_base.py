@@ -49,12 +49,13 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Stage one immutable D4 shared Base with provenance")
+    parser = argparse.ArgumentParser(description="Stage one immutable shared Base with provenance")
     parser.add_argument("--source", required=True, help="shared Base directory containing selected.pt and complete.json")
     parser.add_argument("--destination-output", required=True, help="condition output directory")
     parser.add_argument("--base-config", required=True)
     parser.add_argument("--condition-config", required=True)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--role", default="d4_shared_parent_base")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -104,7 +105,7 @@ def main() -> int:
 
     contract = {
         "abi_version": 1,
-        "role": "d4_shared_parent_base",
+        "role": args.role,
         "git_commit": git_commit(root),
         "seed": args.seed,
         "condition_experiment_fingerprint": condition_fingerprint,
