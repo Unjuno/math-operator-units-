@@ -19,7 +19,7 @@ jobs:
       - name: Install package
         run: python -m pip install -e ".[dev]"
       - name: Validate Python modules
-        run: python -m compileall -q src tests
+        run: python -m compileall -q src tests scripts
       - name: Validate shell launchers
         run: >-
           bash -n
@@ -40,6 +40,7 @@ jobs:
           scripts/d4_launch_specialist_ablation.sh
           scripts/d4_eval_trajectory.sh
           scripts/d4_summary_trajectory.sh
+          scripts/run_d5_operator_unit_factory.sh
       - name: Audit canonical repository contract
         run: |
           set +e
