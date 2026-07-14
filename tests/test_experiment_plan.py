@@ -64,6 +64,8 @@ def test_plan_precommits_fallback_mixing_ladder() -> None:
         "consensus_tempered",
     ]
     assert fallback["global_shrinkage"]["alpha_grid"] == [0.10, 0.20, 0.25, 0.50, 0.75, 1.00]
+    for family in ("norm_controlled", "static_weighted_mean", "consensus_tempered"):
+        assert fallback[family]["alpha_grid_from"] == "global_shrinkage"
     assert fallback["selection"]["choose_first_eligible_family"] is True
     assert fallback["selection"]["freeze_mixer_contract"] is True
     assert fallback["learned_router_followup"]["part_of_confirmatory_final"] is False
