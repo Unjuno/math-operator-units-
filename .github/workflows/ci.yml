@@ -36,6 +36,10 @@ jobs:
           scripts/run_model_design_pilot.sh
           scripts/watch_model_design_pilot.sh
           scripts/status_model_design_pilot.sh
+          scripts/run_d4_ablation.sh
+          scripts/d4_launch_specialist_ablation.sh
+          scripts/d4_eval_trajectory.sh
+          scripts/d4_summary_trajectory.sh
       - name: Audit canonical repository contract
         run: |
           set +e

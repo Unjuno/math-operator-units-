@@ -4,8 +4,8 @@ experiment:
   model_config: configs/model/gpt_operator_1m_surface_v3.yaml
   tokenizer_config: configs/tokenizer/operator_experiment_surface_v3.yaml
   base_model_id: base.common
-  operators: [aggregation.sum]
-  joint_model_ids: []
+  operators: [scalar.add, aggregation.sum, scalar.neg, scalar.min, scalar.max]
+  joint_model_ids: [joint.all_five.exposure_matched]
   seeds: [0]
   require_cuda: true
   precision: auto
@@ -18,7 +18,7 @@ experiment:
     base_target_mode: weak_multitask
     base_weak_operand_abs_max: 8
     base_weak_max_terms: 4
-    selection_metric: generation_trace_validity
+    selection_metric: validation_nll
     strict_experiment_fingerprint: true
     specialist_regularization:
       retention_kl_weight: 0.0
@@ -43,7 +43,7 @@ experiment:
     continuation_weight: 0
     terminal_weight: 0
     max_partition_attempts: 20000
-    randomized_train_reduction: true
+    randomized_train_reduction: false
 
   train:
     response_only_loss: true

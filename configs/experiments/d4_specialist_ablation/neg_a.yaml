@@ -4,8 +4,8 @@ experiment:
   model_config: configs/model/gpt_operator_1m_surface_v3.yaml
   tokenizer_config: configs/tokenizer/operator_experiment_surface_v3.yaml
   base_model_id: base.common
-  operators: [scalar.neg]
-  joint_model_ids: []
+  operators: [scalar.add, aggregation.sum, scalar.neg, scalar.min, scalar.max]
+  joint_model_ids: [joint.all_five.exposure_matched]
   seeds: [0]
   require_cuda: true
   precision: auto

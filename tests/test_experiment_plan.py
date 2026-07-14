@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from opfusion.training.design_config import load_design_run_config
+from opfusion.training.design_config import load_design_run_config, model_design
 
 ROOT = Path(__file__).parents[1]
 PLAN_V1 = ROOT / "configs/experiments/experiment_plan_v1.yaml"
@@ -70,6 +70,60 @@ def test_experiment_plan_v2_matches_configs() -> None:
     assert reporting["report_every_operator"] is True
     assert reporting["aggregate_seed_weighting"] == "equal"
     assert reporting["missing_seed_policy"] == "no_imputation"
+
+
+D4_CONFIGS = [
+    ROOT / "configs/experiments/d4_specialist_ablation/sum_a.yaml",
+    ROOT / "configs/experiments/d4_specialist_ablation/sum_b.yaml",
+    ROOT / "configs/experiments/d4_specialist_ablation/sum_c.yaml",
+    ROOT / "configs/experiments/d4_specialist_ablation/neg_a.yaml",
+    ROOT / "configs/experiments/d4_specialist_ablation/neg_b.yaml",
+    ROOT / "configs/experiments/d4_specialist_ablation/neg_c.yaml",
+]
+
+
+def test_d4_specialist_ablation_configs_load() -> None:
+    for path in D4_CONFIGS:
+        config = load_design_run_config(path)
+        assert config.experiment_id.startswith("d4_specialist_ablation_")
+        assert len(config.operators) == 5
+        assert tuple(config.operators) == (
+            "scalar.add", "aggregation.sum", "scalar.neg", "scalar.min", "scalar.max",
+        )
+        assert len(config.joint_model_ids) >= 1
+        assert config.seeds == (0,)
+        assert config.deterministic_algorithms is True
+
+
+def test_d4_specialist_ablation_conditions() -> None:
+    """Verify A/B/C variant parameters match expectations."""
+    for path in D4_CONFIGS:
+        config = load_design_run_config(path)
+        name = path.stem
+        design = model_design(config)
+        assert design.selection_metric == "validation_nll"
+
+        # B and C variants: canonical left-fold (non-randomized reduction)
+        if name in ("sum_b", "sum_c", "neg_b", "neg_c"):
+            assert config.data.randomized_train_reduction is False, f"{name} should be canonical"
+            assert config.data.full_trace_weight == 100
+            assert config.data.continuation_weight == 0
+            assert config.data.terminal_weight == 0
+        # A variants: randomized reduction
+        else:
+            assert config.data.randomized_train_reduction is True, f"{name} should be randomized"
+            assert config.data.full_trace_weight == 60
+            assert config.data.continuation_weight == 25
+            assert config.data.terminal_weight == 15
+
+        # C variants: narrow domain
+        if name == "sum_c":
+            assert config.data.operand_min == -16 and config.data.operand_max == 16
+            assert config.data.min_terms == 3 and config.data.max_terms == 3
+        elif name == "neg_c":
+            assert config.data.operand_min == -8 and config.data.operand_max == 8
+        else:
+            assert config.data.operand_min == -64 and config.data.operand_max == 64
 
 
 def test_plan_precommits_reproducible_fallback_ladder() -> None:
