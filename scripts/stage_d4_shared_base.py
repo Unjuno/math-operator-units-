@@ -10,6 +10,9 @@ from typing import Any
 
 import torch
 
+from opfusion.training.design_config import load_design_run_config
+from opfusion.training.experiment_contract import build_contract
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -30,7 +33,7 @@ def model_state_sha256(path: Path) -> str:
         digest.update(name.encode("utf-8"))
         digest.update(str(tensor.dtype).encode("ascii"))
         digest.update(str(tuple(tensor.shape)).encode("ascii"))
-        digest.update(tensor.view(torch.uint8).numpy().tobytes())
+        digest.update(bytes(tensor.view(torch.uint8).tolist()))
     return digest.hexdigest()
 
 
@@ -72,21 +75,45 @@ def main() -> int:
     if not isinstance(parent_fingerprint, str) or checkpoint_payload.get("experiment_fingerprint") != parent_fingerprint:
         raise RuntimeError("shared Base fingerprint is missing or inconsistent")
 
+    parent_checkpoint_sha = sha256_file(selected)
+    parent_state_sha = model_state_sha256(selected)
+    condition = load_design_run_config(condition_config)
+    condition_fingerprint = str(build_contract(root, condition)["fingerprint"])
+
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination)
     staged_selected = destination / "selected.pt"
+    staged_complete_path = destination / "complete.json"
+
+    staged_payload = torch.load(staged_selected, map_location="cpu", weights_only=False)
+    staged_payload["parent_experiment_fingerprint"] = parent_fingerprint
+    staged_payload["parent_checkpoint_sha256"] = parent_checkpoint_sha
+    staged_payload["parent_model_state_sha256"] = parent_state_sha
+    staged_payload["experiment_fingerprint"] = condition_fingerprint
+    torch.save(staged_payload, staged_selected)
+
+    staged_complete = load_json(staged_complete_path)
+    staged_complete["parent_experiment_fingerprint"] = parent_fingerprint
+    staged_complete["parent_checkpoint_sha256"] = parent_checkpoint_sha
+    staged_complete["parent_model_state_sha256"] = parent_state_sha
+    staged_complete["experiment_fingerprint"] = condition_fingerprint
+    staged_complete["selected_checkpoint"] = str(staged_selected.relative_to(root))
+    staged_complete_path.write_text(json.dumps(staged_complete, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     contract = {
         "abi_version": 1,
         "role": "d4_shared_parent_base",
         "git_commit": git_commit(root),
         "seed": args.seed,
+        "condition_experiment_fingerprint": condition_fingerprint,
         "parent_experiment_fingerprint": parent_fingerprint,
-        "parent_checkpoint": str(staged_selected.relative_to(root)),
-        "parent_checkpoint_sha256": sha256_file(staged_selected),
-        "parent_model_state_sha256": model_state_sha256(staged_selected),
+        "parent_checkpoint_source": str(selected.relative_to(root)),
+        "parent_checkpoint_sha256": parent_checkpoint_sha,
+        "parent_model_state_sha256": parent_state_sha,
+        "staged_checkpoint": str(staged_selected.relative_to(root)),
+        "staged_checkpoint_sha256": sha256_file(staged_selected),
         "base_config": str(base_config.relative_to(root)),
         "base_config_sha256": sha256_file(base_config),
         "condition_config": str(condition_config.relative_to(root)),
