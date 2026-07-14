@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from opfusion import fusion_eval as core
-from opfusion.final_eval_guard import FINAL_SPLITS, validate_evaluation_policy
+from opfusion.final_eval_policy import FINAL_SPLITS, validate_evaluation_policy
 from opfusion.training.config import load_run_config
 
 
