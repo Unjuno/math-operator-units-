@@ -44,6 +44,7 @@ case "$MODE" in
     max_attempts="${D5_MAX_ATTEMPTS:-5}"
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
       echo "D5 attempt $attempt/$max_attempts"
+      .venv/bin/python scripts/d5_artifact_guard.py || exit 66
       set +e
       .venv/bin/python scripts/d5_operator_unit_factory.py
       code=$?
@@ -55,6 +56,7 @@ case "$MODE" in
     exit 1
     ;;
   foreground)
+    .venv/bin/python scripts/d5_artifact_guard.py || exit 66
     exec .venv/bin/python scripts/d5_operator_unit_factory.py
     ;;
   *) echo "usage: $0 [detach|foreground|watch|status]" >&2; exit 64 ;;
