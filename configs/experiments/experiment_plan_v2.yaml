@@ -2,6 +2,7 @@ plan:
   id: bias_fusion_surface_v4_v2
   supersedes: bias_fusion_surface_v4_v1
   status: prospective_before_target_gpu_pilot
+  document: docs/experiment_plan_v2.md
   smoke:
     config: configs/experiments/gpt_bias_fusion_factory_surface_v4_smoke.yaml
     scientific_evidence: false
