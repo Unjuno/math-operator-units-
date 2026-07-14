@@ -43,7 +43,7 @@ z = z_base + alpha * sum_k B_k
 alpha in {0.10, 0.20, 0.25, 0.50, 0.75, 1.00}
 ```
 
-One alpha is used for every seed, operator, position, and final split.
+One alpha is used for every seed, operator, position, and final split. The same alpha grid is reused by F2–F4 after their family-specific field transformation so amplitude control is comparable across families.
 
 ### F2 — norm-controlled fields
 
@@ -58,7 +58,7 @@ Evaluate:
 - **RMS-equalized mean:** inverse-scale each field by its production-validation RMS, restore the median RMS, then average;
 - **RMS-clipped sum:** cap response-position RMS at validation quantile `q in {0.90, 0.95, 0.99}` before summing.
 
-No operator-specific scale is permitted.
+Apply one alpha from the F1 grid after normalization or clipping. No operator-specific scale is permitted.
 
 ### F3 — static nonnegative weighted mean
 
@@ -67,7 +67,7 @@ z = z_base + alpha * sum_k pi_k B_k
 pi_k = softmax(a_k)
 ```
 
-The five weights and alpha are constant across prompts, operators, seeds, and token positions. Fit with regularization toward uniform weights. This tests systematic scale imbalance without introducing routing.
+The five weights and alpha are constant across prompts, operators, seeds, and token positions. Alpha uses the F1 grid. Fit the weights with regularization toward uniform values. This tests systematic scale imbalance without introducing routing.
 
 ### F4 — deterministic consensus-tempered decoding
 
@@ -80,7 +80,7 @@ beta in {0.5, 1.0, 2.0}
 z = z_base + alpha * sum_k w_k B_k
 ```
 
-This method is input-dependent but has no trained router. It must be labeled consensus-tempered decoding, not raw composition. Because the relevant unit can legitimately disagree with inactive units, improvement is not assumed.
+Alpha uses the F1 grid. This method is input-dependent but has no trained router. It must be labeled consensus-tempered decoding, not raw composition. Because the relevant unit can legitimately disagree with inactive units, improvement is not assumed.
 
 ### F5 — learned router or corrector
 
