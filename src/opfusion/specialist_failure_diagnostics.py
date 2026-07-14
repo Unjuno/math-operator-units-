@@ -56,7 +56,7 @@ def diagnose_manifest(
     config_path = Path(config_path).resolve()
     manifest_path = Path(manifest_path).resolve()
     run = load_run_config(config_path)
-    root = config_path.parents[2]
+    root = config_path.parents[3]
     tokenizer = FixedVocabTokenizer.from_config(root / run.tokenizer_config)
     factory = SyntheticTraceFactory(tokenizer, run.data)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

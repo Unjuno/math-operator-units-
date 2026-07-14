@@ -53,7 +53,7 @@ def evaluate_manifest_seeded(
         raise ValueError("evaluation_seed must be nonnegative")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     authorization = validate_evaluation_policy(
-        repo_root=config_path.parents[2],
+        repo_root=config_path.parents[3],
         config=run,
         manifest=manifest,
         split=split,

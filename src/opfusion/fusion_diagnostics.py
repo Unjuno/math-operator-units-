@@ -41,7 +41,7 @@ def evaluate_unit_diagnostics(
     evaluation_seed: int | None = None,
 ) -> dict[str, Any]:
     config_path = Path(config_path).resolve()
-    repo_root = config_path.parents[2]
+    repo_root = config_path.parents[3]
     run = load_run_config(config_path)
     resolved_seed = (
         DEFAULT_PILOT_EVALUATION_SEED

@@ -64,7 +64,7 @@ def _planned_operator_tokens(repo_root: Path, config: dict[str, Any]) -> Iterabl
 
 def build_vocab(config_path: str | Path, repo_root: str | Path | None = None) -> list[str]:
     config_path = Path(config_path)
-    root = Path(repo_root) if repo_root is not None else config_path.parents[2]
+    root = Path(repo_root) if repo_root is not None else config_path.parents[3]
     config = load_yaml(config_path)
 
     tokens: list[str] = []

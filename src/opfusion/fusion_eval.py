@@ -150,7 +150,7 @@ def evaluate_manifest(
     evaluation_seed: int = DEFAULT_EVALUATION_SEED,
 ) -> dict[str, Any]:
     config_path = Path(config_path).resolve()
-    root = config_path.parents[2]
+    root = config_path.parents[3]
     run = load_run_config(config_path)
     tokenizer = FixedVocabTokenizer.from_config(root / run.tokenizer_config)
     factory = SyntheticTraceFactory(tokenizer, run.data)
