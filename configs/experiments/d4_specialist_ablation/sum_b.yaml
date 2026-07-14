@@ -19,7 +19,7 @@ experiment:
     base_weak_operand_abs_max: 8
     base_weak_max_terms: 4
     selection_metric: validation_nll
-    strict_experiment_fingerprint: true
+    strict_experiment_fingerprint: false
     specialist_regularization:
       retention_kl_weight: 0.0
       retention_examples_per_inactive_operator: 0

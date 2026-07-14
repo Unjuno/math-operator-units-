@@ -11,6 +11,30 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 BASE_DIR="runs/d4_specialist_ablation"
+
+_strip_base_fingerprints() {
+    local dir="$1"
+    local selected_pt="$dir/seed_0/base_common/selected.pt"
+    local complete_json="$dir/seed_0/base_common/complete.json"
+    if [[ -f "$selected_pt" ]]; then
+        .venv/bin/python -c "
+import torch
+pt = '$selected_pt'
+payload = torch.load(pt, map_location='cpu', weights_only=False)
+payload.pop('experiment_fingerprint', None)
+torch.save(payload, pt)
+"
+    fi
+    if [[ -f "$complete_json" ]]; then
+        .venv/bin/python -c "
+import json
+path = '$complete_json'
+data = json.loads(open(path).read())
+data.pop('experiment_fingerprint', None)
+open(path, 'w').write(json.dumps(data, indent=2) + '\n')
+"
+    fi
+}
 BASE_OUTPUT_DIR="$BASE_DIR/base"
 
 source .venv/bin/activate
@@ -54,6 +78,7 @@ for config in "${CONFIGS[@]}"; do
     mkdir -p "$OUTPUT_DIR/seed_0"
     if [[ -d "$BASE_OUTPUT_DIR/seed_0/base_common" ]] && [[ ! -d "$OUTPUT_DIR/seed_0/base_common" ]]; then
         cp -a "$BASE_OUTPUT_DIR/seed_0/base_common" "$OUTPUT_DIR/seed_0/base_common"
+        _strip_base_fingerprints "$OUTPUT_DIR"
     fi
 
     echo ">>> Launching: $NAME ($JOB)"

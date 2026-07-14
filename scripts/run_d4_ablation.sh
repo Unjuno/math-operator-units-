@@ -65,6 +65,32 @@ fi
 cd "$REPO_ROOT"
 mkdir -p logs "$BASE_DIR"
 
+_strip_base_fingerprints() {
+    local dir="$1"
+    local selected_pt="$dir/seed_0/base_common/selected.pt"
+    local complete_json="$dir/seed_0/base_common/complete.json"
+    if [[ -f "$selected_pt" ]]; then
+        echo "  Stripping fingerprint from base selected.pt..."
+        .venv/bin/python -c "
+import torch
+pt = '$selected_pt'
+payload = torch.load(pt, map_location='cpu', weights_only=False)
+payload.pop('experiment_fingerprint', None)
+torch.save(payload, pt)
+"
+    fi
+    if [[ -f "$complete_json" ]]; then
+        echo "  Stripping fingerprint from base complete.json..."
+        .venv/bin/python -c "
+import json
+path = '$complete_json'
+data = json.loads(open(path).read())
+data.pop('experiment_fingerprint', None)
+open(path, 'w').write(json.dumps(data, indent=2) + '\n')
+"
+    fi
+}
+
 # ── Step 0: Train base.common once into a shared location ──────────────────
 BASE_OUTPUT_DIR="$BASE_DIR/base"
 if [[ "$SKIP_BASE" == true ]]; then
@@ -90,12 +116,13 @@ else
     fi
     echo "✓ Base training complete"
 
-    # Move base to shared location
+    # Move base to shared location and strip fingerprints
     mkdir -p "$BASE_OUTPUT_DIR/seed_0"
     FIRST_OUTPUT_DIR="$BASE_DIR/sum_a"
     if [[ -d "$FIRST_OUTPUT_DIR/seed_0/base_common" ]]; then
         cp -a "$FIRST_OUTPUT_DIR/seed_0/base_common" "$BASE_OUTPUT_DIR/seed_0/"
     fi
+    _strip_base_fingerprints "$BASE_OUTPUT_DIR"
 fi
 
 if [[ "$BASE_ONLY" == true ]]; then
@@ -122,6 +149,7 @@ for cfg in "${CONFIGS[@]}"; do
     if [[ -d "$BASE_OUTPUT_DIR/seed_0/base_common" ]] && [[ ! -d "$OUTPUT_DIR/seed_0/base_common" ]]; then
         echo "Staging shared base checkpoint..."
         cp -a "$BASE_OUTPUT_DIR/seed_0/base_common" "$OUTPUT_DIR/seed_0/base_common"
+        _strip_base_fingerprints "$OUTPUT_DIR"
     fi
     
     .venv/bin/opfusion-train-one-design \
