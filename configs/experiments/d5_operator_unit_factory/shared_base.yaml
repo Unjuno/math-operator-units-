@@ -39,11 +39,11 @@ experiment:
     partition_modulus: 100
     train_bucket_end: 70
     validation_bucket_end: 85
-    full_trace_weight: 100
-    continuation_weight: 0
-    terminal_weight: 0
+    full_trace_weight: 60
+    continuation_weight: 25
+    terminal_weight: 15
     max_partition_attempts: 20000
-    randomized_train_reduction: false
+    randomized_train_reduction: true
 
   train:
     response_only_loss: true
