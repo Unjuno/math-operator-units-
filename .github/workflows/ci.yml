@@ -19,7 +19,7 @@ jobs:
       - name: Install package
         run: python -m pip install -e ".[dev]"
       - name: Validate Python modules
-        run: python -m compileall -q src tests
+        run: python -m compileall -q src tests scripts
       - name: Validate shell launchers
         run: >-
           bash -n
