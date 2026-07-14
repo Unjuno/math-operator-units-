@@ -125,6 +125,10 @@ def test_d4_specialist_ablation_conditions() -> None:
         else:
             assert config.data.operand_min == -64 and config.data.operand_max == 64
 
+        # NEG configs use 3-8 term range (needed for multi-operator validation)
+        # SUM-C uses 3-3 (narrow domain), SUM-A/B use 3-8
+        assert config.data.min_terms == 3
+
 
 def test_plan_precommits_reproducible_fallback_ladder() -> None:
     plan = load_plan(PLAN_V2)

@@ -28,14 +28,14 @@ experiment:
   data:
     operand_min: -64
     operand_max: 64
-    min_terms: 1
-    max_terms: 1
+    min_terms: 3
+    max_terms: 8
     numeric_token_min: -1024
     numeric_token_max: 1024
     operand_ood_abs_min: 65
     operand_ood_abs_max: 80
-    length_ood_min_terms: 2
-    length_ood_max_terms: 2
+    length_ood_min_terms: 9
+    length_ood_max_terms: 10
     partition_modulus: 100
     train_bucket_end: 70
     validation_bucket_end: 85
