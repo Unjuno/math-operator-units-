@@ -10,7 +10,7 @@ experiment:
   require_cuda: true
   precision: auto
   allow_tf32: false
-  max_parameters: 1000000
+  max_parameters: 1100000
   deterministic_algorithms: true
   continue_on_error: false
 
@@ -23,25 +23,25 @@ experiment:
     specialist_regularization:
       retention_kl_weight: 0.0
       retention_examples_per_inactive_operator: 0
-      parameter_anchor_weight: 1.0
+      parameter_anchor_weight: 0.000001
 
   data:
     operand_min: -8
     operand_max: 8
     min_terms: 3
-    max_terms: 8
+    max_terms: 3
     numeric_token_min: -1024
     numeric_token_max: 1024
     operand_ood_abs_min: 9
     operand_ood_abs_max: 12
-    length_ood_min_terms: 9
-    length_ood_max_terms: 10
+    length_ood_min_terms: 4
+    length_ood_max_terms: 4
     partition_modulus: 100
     train_bucket_end: 70
     validation_bucket_end: 85
-    full_trace_weight: 100
-    continuation_weight: 0
-    terminal_weight: 0
+    full_trace_weight: 60
+    continuation_weight: 25
+    terminal_weight: 15
     max_partition_attempts: 20000
     randomized_train_reduction: false
 
@@ -56,11 +56,11 @@ experiment:
     eval_examples: 128
     generation_eval_every: 500
     generation_eval_examples: 16
-    generation_max_new_tokens: 32
+    generation_max_new_tokens: 256
     log_every: 50
     resume_every: 250
     checkpoint_every: 50
-    checkpoint_steps: [30, 60, 90, 150, 300, 500, 1000, 2000]
+    checkpoint_steps: [30, 60, 90, 150, 300, 500, 1000, 2000, 3000]
     checkpoint_fractions: [0.0, 0.01, 0.03, 0.10, 0.20, 0.40, 0.60, 0.80, 1.0]
     optimizer:
       learning_rate: 0.0003

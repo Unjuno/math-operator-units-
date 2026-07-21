@@ -135,6 +135,11 @@ def main() -> int:
                 f"output_dir: runs/bias_factory/spec_{spec_name}",
                 1
             )
+            text = text.replace(
+                "\n  base_model_id: base.common",
+                "\n  # base_model_id: null  (specialist trains from scratch)",
+                1
+            )
             text += f"""  model_config: configs/model/{model_cfg}
   max_parameters: {param_limit}
   operators: [{op_full}]

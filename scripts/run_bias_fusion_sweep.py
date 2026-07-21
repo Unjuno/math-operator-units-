@@ -66,7 +66,9 @@ def _extract_logits(
                 start = len(prompt) - 1
                 logits = model(input_ids)[:, start:, :]
                 logits_list.append(logits.squeeze(0).cpu())
-            result[operator_id] = torch.stack(logits_list).mean(dim=0)
+            max_len = max(t.size(0) for t in logits_list)
+            padded = [F.pad(t, (0, 0, 0, max_len - t.size(0))) for t in logits_list]
+            result[operator_id] = torch.stack(padded).mean(dim=0)
     return result
 
 
@@ -74,7 +76,10 @@ def _checkpoint(size: str, snapshot_step: int, kind: str = "joint", spec_op: str
     if kind == "joint":
         return ROOT / f"runs/bias_factory/{size}/seed_0/base_common/checkpoints/step_{snapshot_step:09d}.pt"
     else:
-        return ROOT / f"runs/bias_factory/spec_{size}_{spec_op}/seed_0/base_common/checkpoints/step_{snapshot_step:09d}.pt"
+        op_job = {"sum": "aggregation.sum", "neg": "scalar.neg", "add": "scalar.add",
+                   "min": "scalar.min", "max": "scalar.max"}[spec_op]
+        op_dir = op_job.replace(".", "_")
+        return ROOT / f"runs/bias_factory/spec_{size}_{spec_op}/seed_0/{op_dir}/checkpoints/step_{snapshot_step:09d}.pt"
 
 
 def main() -> int:

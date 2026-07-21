@@ -10,7 +10,7 @@ experiment:
   require_cuda: true
   precision: auto
   allow_tf32: false
-  max_parameters: 1000000
+  max_parameters: 1100000
   deterministic_algorithms: true
   continue_on_error: false
 

@@ -2,7 +2,7 @@ experiment:
   id: bias_factory_spec_1m_sum
   output_dir: runs/bias_factory/spec_1m_sum
   tokenizer_config: configs/tokenizer/operator_experiment_surface_v3.yaml
-  base_model_id: base.common
+  # base_model_id: null  (specialist trains from scratch)
   joint_model_ids: [joint.all_five.exposure_matched]
   seeds: [0]
   require_cuda: true

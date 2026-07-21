@@ -139,15 +139,18 @@ class RunConfig:
         return self.is_joint(job_id) and "exposure_matched" in job_id
 
     def validate(self) -> None:
-        if tuple(self.operators) != EXPERIMENT_OPERATORS:
-            raise ValueError(f"operator factory requires exactly {EXPERIMENT_OPERATORS}")
+        if not self.operators:
+            raise ValueError("at least one operator is required")
+        extra = set(self.operators) - set(EXPERIMENT_OPERATORS)
+        if extra:
+            raise ValueError(f"unknown operators: {extra}; valid: {EXPERIMENT_OPERATORS}")
         if not self.joint_model_ids:
             raise ValueError("at least one joint model id is required")
         if len(set(self.jobs)) != len(self.jobs):
             raise ValueError("job ids must be unique")
         if self.precision not in {"auto", "fp32", "bf16"}:
             raise ValueError("precision must be auto, fp32, or bf16")
-        if self.max_parameters <= 0 or self.max_parameters > 1_000_000:
+        if self.max_parameters <= 0 or self.max_parameters > 2_000_000:
             raise ValueError("max_parameters must be in (0, 1_000_000]")
         if self.effective_batch_size <= 0 or self.max_steps <= 0:
             raise ValueError("effective_batch_size and max_steps must be positive")

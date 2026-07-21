@@ -14,6 +14,17 @@ mkdir -p "$RUNS_DIR" logs
 SIZES=("nano" "small" "medium" "1m")
 OPS=("sum" "neg" "add" "min" "max")
 
+_op_job() {
+    case "$1" in
+        sum) echo "aggregation.sum" ;;
+        neg) echo "scalar.neg" ;;
+        add) echo "scalar.add" ;;
+        min) echo "scalar.min" ;;
+        max) echo "scalar.max" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
 echo ""
 echo "============================================="
 echo "PHASE 1: Joint models  (4 runs)"
@@ -50,16 +61,18 @@ for size in "${SIZES[@]}"; do
     for op in "${OPS[@]}"; do
         cfg="configs/experiments/bias_factory/spec_${size}_${op}.yaml"
         spec_name="${size}_${op}"
-        complete="$RUNS_DIR/spec_${spec_name}/seed_0/base_common/complete.json"
+        op_job="$(_op_job "$op")"
+        op_dir="${op_job//./_}"
+        complete="$RUNS_DIR/spec_${spec_name}/seed_0/${op_dir}/complete.json"
 
         if [[ -f "$complete" ]]; then
             echo "Reusing completed: spec $spec_name"
             continue
         fi
 
-        echo "Training spec $spec_name..."
+        echo "Training spec $spec_name (job=$op_job)..."
         .venv/bin/opfusion-train-one-design \
-            --config "$cfg" --job base.common --seed 0 \
+            --config "$cfg" --job "$op_job" --seed 0 \
             2>&1 | tee "logs/bias_factory_spec_${spec_name}_$(date -u +%Y%m%dT%H%M%SZ).log"
 
         exit_code=${PIPESTATUS[0]}
